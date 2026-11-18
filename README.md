@@ -1,185 +1,197 @@
-# Prospecta: prospecção B2B por raio, pelo Telegram
+# Prospecta: encontre clientes para o seu serviço perto de você
 
-O prestador de serviço manda um **endereço**, um **CEP** ou a **localização** para um bot no Telegram.
-O bot procura no Google Maps, dentro do raio escolhido, os negócios que podem contratar o serviço dele
-e devolve:
+Ferramenta gratuita e de código aberto para **profissionais autônomos e pequenas empresas de
+serviço**. Diga o que você faz e de onde quer partir, e ela procura no Google Maps, num raio de
+alguns quilômetros, as empresas que podem contratar você: padarias para quem conserta freezer,
+clínicas para quem limpa ar-condicionado, restaurantes para quem faz dedetização, e assim por diante.
 
-- **Lista priorizada** (nota de 0 a 100, prioridade A/B/C), 10 por página
-- **Ficha de cada prospect**: telefone (celular ou fixo), WhatsApp, e-mail, site, Instagram, nota e
-  avaliações no Google, horário, distância e sinais de necessidade encontrados nas avaliações
-- **Botão de WhatsApp** que abre a conversa com uma mensagem de abordagem já escrita, com o nome do
-  prospect, o bairro, o seu nome e a sua empresa
-- **Rota otimizada de visitas** saindo da sua empresa, aberta direto no Google Maps (em trechos de até
-  9 paradas), além de link de rota e Waze para cada prospect
-- **Planilha (XLSX)** com todos os dados, links clicáveis e colunas para acompanhar os contatos
-- **Mapa (KML)** para importar no Google My Maps, com cores por prioridade
-- **Mini-CRM**: marque cada prospect como interessado, contatado, visitar, cliente ou sem interesse, e
-  anote observações. O comando /funil mostra o resumo.
-- **Só prospects novos**: o modo /novos esconde o que você já recebeu em buscas anteriores
+Tudo roda **no seu computador**. Não precisa de conta, assinatura ou chave de API, e os dados não saem
+da sua máquina.
 
-Os dados vêm do motor do [google-maps-scraper-kit](https://github.com/mahanaicoach/google-maps-scraper-kit),
-que roda no seu computador ou servidor. Não usa API paga nem chave do Google.
+## O que você recebe
 
-## Para quais serviços
+- **Lista priorizada** com nota de 0 a 100 e prioridade A, B ou C.
+- **Contato de cada empresa**: telefone (celular ou fixo), WhatsApp, e-mail, Instagram, site, nota e
+  avaliações no Google, horário e distância.
+- **Botão de WhatsApp** que abre a conversa com uma mensagem de apresentação já escrita, com o nome da
+  empresa, o bairro, o seu nome e a sua empresa. Quem envia é você.
+- **Rota de visitas otimizada** saindo da sua empresa, aberta direto no Google Maps, além de link de
+  rota e Waze para cada empresa.
+- **Relatório para abrir no navegador** (`relatorio.html`), com mapa, filtros e um campo de status
+  de cada contato: interessado, contatado, visitar, cliente ou sem interesse.
+- **Planilha** (`prospects.xlsx`) com tudo e colunas para acompanhar os contatos, e **mapa**
+  (`prospects.kml`) para o Google My Maps.
+- **Só os novos**: na busca do mês seguinte, `--so-novos` mostra só as empresas que você ainda não
+  tinha.
 
-Funciona para qualquer prestador B2B. Há 12 perfis prontos em [`prospecta/perfis.json`](prospecta/perfis.json):
+## Como usar: entregue o link ao seu agente de IA
+
+O jeito mais fácil é pedir a um **agente de IA que roda no seu computador** para fazer tudo por você.
+Ele instala, faz as perguntas certas, roda a busca e mostra o resultado. Funciona com:
+
+- **Claude Code**: no terminal ou na aba "Code" do app Claude para desktop
+- **Codex**, o agente do ChatGPT: no app do Codex, no terminal ou no VS Code
+- **Cursor**, **Gemini CLI** ou outro agente que execute comandos no seu computador
+
+> O ChatGPT e o Claude **comuns, no navegador**, não conseguem rodar programas no seu computador.
+> Use um dos agentes acima.
+
+Abra o agente numa pasta qualquer e cole a mensagem abaixo, trocando o que está entre colchetes:
+
+```text
+Clone https://github.com/RodrigoFlorencio86/AI-Stuff e siga o arquivo prospecta-bot/AGENTS.md
+para instalar e me ajudar a encontrar clientes. Eu trabalho com [seu serviço, ex.: manutenção de
+ar-condicionado] e minha empresa fica em [endereço ou CEP]. Quero procurar num raio de [3] km.
+Meu nome e empresa para as mensagens: [Seu Nome | Sua Empresa].
+```
+
+O agente lê o [`AGENTS.md`](AGENTS.md), que tem o passo a passo e as regras: uma busca por vez,
+nada de envio automático de mensagens, dados só no seu computador. O Claude Code também carrega a
+skill `prospectar` desta pasta.
+
+## Como usar sem agente
+
+Precisa de **Python 3.9+** ([download](https://www.python.org/downloads/); no Windows, marque
+"Add python.exe to PATH") e, de preferência, do Google Chrome. No Windows, troque `python3` por `py`.
+
+```bash
+git clone https://github.com/RodrigoFlorencio86/AI-Stuff.git
+cd AI-Stuff/prospecta-bot
+python3 -m prospecta instalar          # baixa o motor de busca e confere tudo (uma vez)
+python3 -m prospecta perfis            # serviços prontos
+
+python3 -m prospecta buscar "Rua Exemplo, 100, Campinas SP" --raio 3 --perfil climatizacao \
+    --empresa "Ana Souza | Clima Bom"
+```
+
+Serviço que não está na lista? Diga o que procurar:
+
+```bash
+python3 -m prospecta buscar "13010-001" --raio 2 --alvos "padaria, pizzaria, hotel" \
+    --servico "Manutenção de fornos" --sinais "forno, queimado" --empresa "João | Forno Certo"
+```
+
+O resultado fica em `resultados/<data>_<serviço>_<local>/`. Abra o `relatorio.html` no navegador.
+
+### Opções da busca
+
+| Opção | Para quê |
+|---|---|
+| `--raio 3` | Raio em km (padrão 3). De 1 a 5 km costuma ser o ideal |
+| `--perfil limpeza` | Usa um serviço pronto (lista: `python3 -m prospecta perfis`) |
+| `--alvos "a, b, c"` | Tipos de negócio a procurar, como você digitaria no Google Maps |
+| `--servico "..."` | Nome do seu serviço, quando usar `--alvos` |
+| `--sinais "a, b"` | Palavras nas avaliações que indicam necessidade (ex.: "calor", "barata") |
+| `--mensagem "..."` | Sua mensagem de WhatsApp, com `{prospect}`, `{bairro}`, `{meu_nome}` e `{minha_empresa}` |
+| `--empresa "Nome \| Empresa"` | Quem assina a mensagem |
+| `--base "endereço"` | Ponto de partida das rotas, se for diferente do centro da busca |
+| `--modo completo` | Mais resultados e leitura das avaliações, mas várias vezes mais lento |
+| `--so-novos` | Esconde empresas que já apareceram em buscas anteriores |
+| `--rota 10` | Quantas das melhores entram na rota sugerida (0 para nenhuma) |
+
+## Serviços prontos
 
 | Perfil | Procura por (exemplos) |
 |---|---|
-| Refrigeração comercial | padarias, sorveterias, açougues, mercados, distribuidoras de bebidas |
-| Ar-condicionado e climatização | clínicas, consultórios, academias, escritórios, escolas |
-| Limpeza e conservação | escritórios, clínicas, condomínios, coworkings, hotéis |
-| Dedetização e controle de pragas | restaurantes, padarias, escolas, creches, condomínios |
-| Prevenção de incêndio | restaurantes, postos, oficinas, galpões, casas de festas |
-| Segurança eletrônica | lojas, farmácias, postos, óticas, condomínios |
-| Suporte de TI e redes | escritórios de contabilidade e advocacia, clínicas, imobiliárias |
-| Contabilidade e BPO financeiro | salões, pet shops, lojas, restaurantes, academias |
-| Marketing digital | restaurantes, salões, clínicas de estética, imobiliárias |
-| Manutenção predial | condomínios, escolas, clínicas, hotéis, galpões |
-| Coifas e cozinhas industriais | restaurantes, pizzarias, churrascarias, buffets |
-| Lavanderia e enxoval | hotéis, pousadas, motéis, salões, spas |
+| `refrigeracao`: Refrigeração comercial | padarias, sorveterias, açougues, mercados, distribuidoras de bebidas |
+| `climatizacao`: Ar-condicionado | clínicas, consultórios, academias, escritórios, escolas |
+| `limpeza`: Limpeza e conservação | escritórios, clínicas, condomínios, coworkings, hotéis |
+| `dedetizacao`: Controle de pragas | restaurantes, padarias, escolas, creches, condomínios |
+| `extintores`: Prevenção de incêndio | restaurantes, postos, oficinas, galpões, casas de festas |
+| `seguranca`: Segurança eletrônica | lojas, farmácias, postos, óticas, condomínios |
+| `ti`: Suporte de TI e redes | escritórios de contabilidade e advocacia, clínicas, imobiliárias |
+| `contabilidade`: Contabilidade | salões, pet shops, lojas, restaurantes, academias |
+| `marketing`: Marketing digital | restaurantes, salões, clínicas de estética, imobiliárias |
+| `manutencao_predial`: Manutenção predial | condomínios, escolas, clínicas, hotéis, galpões |
+| `coifas`: Coifas e cozinhas industriais | restaurantes, pizzarias, churrascarias, buffets |
+| `lavanderia`: Lavanderia e enxoval | hotéis, pousadas, motéis, salões, spas |
 
-Nenhum serve? No bot, use `/alvos padaria, hotel, academia` (até 20 tipos). Para criar um perfil
-permanente, copie um bloco do `perfis.json`. Cada perfil tem quatro partes:
+Para criar o seu de vez, copie um bloco de [`prospecta/perfis.json`](prospecta/perfis.json) e ajuste
+os `alvos`, os `sinais` e a `mensagem`. Ou peça ao seu agente para fazer isso.
 
-- `alvos`: tipos de negócio a procurar, como você digitaria no Google Maps
-- `sinais`: palavras nas avaliações que indicam necessidade (ex.: "freezer", "calor", "barata")
-- `mensagem`: a abordagem sugerida, com `{prospect}`, `{bairro}`, `{meu_nome}` e `{minha_empresa}`
-- `nome` e `descricao`: como o perfil aparece no bot
+## Como funciona
 
-## Como a busca funciona
-
-1. O endereço vira coordenadas: CEP pelo ViaCEP e endereços pelo OpenStreetMap (Nominatim).
-2. O círculo do raio é coberto por uma malha de pontos de busca. É isso que passa do limite de
-   ~120 resultados por busca do Google e mantém a busca dentro do raio.
-3. Em cada ponto, o motor procura todos os tipos de negócio do perfil, em português e com o Google
-   configurado para o Brasil.
-4. Os resultados são juntados sem repetição. Saem quem está fora do raio e quem está fechado
-   definitivamente.
-5. Os sites das empresas são lidos para achar links de WhatsApp. "Sites" que são só Instagram ou
-   wa.me contam como "sem site próprio".
-6. Cada prospect recebe uma nota:
+1. O endereço vira coordenadas: CEP pelo ViaCEP e endereços pelo OpenStreetMap.
+2. O raio é coberto por vários pontos de busca no Google Maps. Isso passa do limite de ~120
+   resultados por busca e mantém tudo dentro do raio. As buscas usam o
+   [google-maps-scraper-kit](https://github.com/mahanaicoach/google-maps-scraper-kit), que roda no seu
+   computador com o Chrome, sem janela.
+3. Repetidos, empresas fora do raio e empresas fechadas definitivamente são descartados.
+4. Os sites são lidos para achar links de WhatsApp. "Sites" que são só Instagram ou WhatsApp contam
+   como "sem site próprio".
+5. Cada empresa recebe uma nota:
 
    | Critério | Pontos |
    |---|---|
-   | Distância da base | até 35 |
+   | Distância | até 35 |
    | Contato: WhatsApp confirmado 20, celular 18, fixo 10, +5 com e-mail ou Instagram | até 25 |
    | Porte: número de avaliações no Google | até 20 |
-   | Sinais de necessidade nas avaliações (modo completo) | até 20 |
+   | Sinais de necessidade nas avaliações (`--modo completo`) | até 20 |
 
-**Modos de busca** (comando /modo):
+Antes de começar, a busca mostra a estimativa de tempo. Em geral, leva de 5 a 30 minutos: menos
+tipos de negócio e raio menor deixam mais rápido.
 
-- **rápido**: ~20 lugares por tipo em cada ponto, sem ler avaliações.
-- **completo**: ~60 lugares por tipo, pontos mais próximos e 3 avaliações por lugar. Encontra mais e
-  detecta sinais de necessidade, mas leva várias vezes mais tempo.
+## Cuidados
 
-Antes de começar, o bot mostra quantas áreas vai pesquisar e o tempo estimado. Menos tipos de
-negócio e raio menor deixam a busca mais rápida.
+- **Use com moderação.** Raspar o Google Maps vai contra os termos de uso do Google. Quem busca
+  demais fica temporariamente bloqueado (por horas, não na sua conta Google). Faça uma busca por vez,
+  algumas por dia.
+- **WhatsApp:** "provável" quer dizer celular, "possível" quer dizer fixo (pode ter WhatsApp
+  Business) e "confirmado" quer dizer que o site tem link de WhatsApp. Mande mensagens
+  personalizadas, uma por uma. Disparo em massa leva ao banimento do número.
+- **LGPD:** são dados públicos de empresas, usados para oferta de serviço B2B. Identifique-se, diga de
+  onde veio o contato se perguntarem e atenda na hora quem pedir para não ser mais procurado.
+- **Rotas:** distância e tempo são estimativas. O trajeto real é calculado pelo Google Maps quando
+  você abre o link.
 
-## Instalação
+## Opcional: usar pelo celular, com Telegram
 
-### 1. Crie o bot no Telegram
+O mesmo sistema pode virar um bot privado de Telegram. Você manda um endereço ou a localização e
+recebe a lista, as fichas com botão de WhatsApp, a rota, a planilha, o mapa e um mini-CRM (/funil).
+O computador ou servidor onde ele roda precisa ficar ligado.
 
-Fale com o [@BotFather](https://t.me/BotFather), mande `/newbot`, escolha nome e usuário e copie o token.
+1. No Telegram, fale com o [@BotFather](https://t.me/BotFather), mande `/newbot` e copie o token
+   para `TELEGRAM_TOKEN` no `.env`.
+2. Rode `python3 -m prospecta bot` e mande `/start` ao seu bot. Ele responde com o seu ID. Coloque o
+   ID em `USUARIOS_PERMITIDOS` no `.env` e reinicie o bot.
+3. Num servidor (VPS), `docker compose up -d --build` sobe o motor e o bot juntos. O bot não precisa
+   de IP público nem de porta aberta.
 
-### 2. Configure
-
-```bash
-cd prospecta-bot
-cp .env.example .env
-# edite o .env: TELEGRAM_TOKEN, USUARIOS_PERMITIDOS e CONTATO_GEOCODER
-```
-
-O bot é privado: só responde aos IDs em `USUARIOS_PERMITIDOS`. Não sabe o seu ID? Ligue o bot,
-mande /start, e ele responde com o ID. Coloque-o no `.env` e reinicie.
-
-### 3a. Rodar com Docker (recomendado para servidor ou VPS)
-
-```bash
-docker compose up -d --build
-docker compose logs -f bot
-```
-
-Isso sobe o motor de busca (Chrome sem janela) e o bot. Nada fica exposto na internet: o bot usa
-long polling, então não precisa de IP público nem de porta aberta. Uma VPS pequena (2 GB de RAM)
-dá conta.
-
-### 3b. Rodar sem Docker (no seu computador)
-
-Precisa de Python 3.9+ e Google Chrome.
-
-```bash
-git clone https://github.com/mahanaicoach/google-maps-scraper-kit.git
-python3 google-maps-scraper-kit/scripts/engine.py start      # motor em localhost:8080
-
-cd prospecta-bot
-pip install -r requirements.txt        # opcional: sem isso a planilha sai em CSV
-python3 -m prospecta verificar         # testa motor, mapas e Telegram
-python3 -m prospecta bot
-```
-
-### Sem Telegram, pela linha de comando
-
-```bash
-python3 -m prospecta perfis
-python3 -m prospecta buscar "Av. Brasil, 1000, Campinas" --raio 3 --perfil dedetizacao \
-    --empresa "Ana | Casa Limpa" --saida resultados
-python3 -m prospecta buscar "13010-001" --alvos "padaria, sorveteria" --modo completo
-```
-
-## Comandos do bot
+Comandos do bot:
 
 | Comando | O que faz |
 |---|---|
-| *endereço, CEP ou 📎 localização* | Mostra o resumo da busca (serviço, raio, tempo estimado) e pede confirmação |
 | `/perfil` | Escolhe o serviço que você presta |
-| `/alvos padaria, hotel` | Procura tipos de negócio específicos (`/alvos limpar` volta ao padrão) |
-| `/raio 3` | Raio em km. Também dá para trocar por botões na confirmação |
+| `/alvos padaria, hotel` | Procura tipos de negócio específicos |
+| `/raio 3` | Raio em km |
 | `/modo` | Rápido ou completo |
-| `/empresa Ana \| Frio Total` | Seu nome e empresa, usados na mensagem de WhatsApp |
-| `/base Rua X, 100, Cidade` | Endereço da sua empresa, ponto de partida das rotas |
+| `/empresa Ana \| Frio Total` | Quem assina a mensagem |
+| `/base Rua X, 100` | Ponto de partida das rotas |
 | `/lista`, `/rota 8`, `/planilha` | Lista, rota e arquivos da última busca |
-| `/funil` | Resumo do mini-CRM |
-| `/novos` | Liga ou desliga o modo "só o que eu ainda não recebi" |
+| `/funil` | Resumo dos contatos que você marcou |
+| `/novos` | Mostra só empresas que você ainda não recebeu |
 | `/config`, `/cancelar` | Ver configurações e cancelar a busca em andamento |
 
-## Limites e cuidados
-
-- **Bloqueio do Google**: raspar o Google Maps vai contra os termos de uso do Google e, em excesso,
-  leva a bloqueio temporário do IP. O bot limita as buscas por dia (`BUSCAS_POR_DIA`) e faz uma
-  busca por vez. Se o Google bloquear, a busca para e entrega o que já encontrou.
-- **WhatsApp**: "provável" quer dizer celular, "possível" quer dizer fixo (pode ter WhatsApp
-  Business) e "confirmado" quer dizer que o site tem link de WhatsApp. Mande mensagens
-  personalizadas e em pequena quantidade. Disparo em massa leva ao banimento do número.
-- **LGPD**: são dados públicos de empresas, usados para oferta B2B (base legal: legítimo interesse).
-  Identifique-se na mensagem, explique de onde veio o contato se perguntarem, e atenda na hora quem
-  pedir para não ser mais contatado (marque como "sem interesse").
-- **Rotas**: sem `OSRM_URL`, distância e tempo são estimativas (linha reta × 1,35 a 22 km/h). O
-  trajeto real é calculado pelo Google Maps quando você abre o link.
-- **Geocodificação**: o Nominatim público aceita 1 pedido por segundo e pede um e-mail de contato
-  (`CONTATO_GEOCODER`). Se o endereço não for achado, mande a localização pelo Telegram.
-
-## Testes
+## Para desenvolvedores
 
 ```bash
-python3 -m unittest discover -s tests -t .
+python3 -m unittest discover -s tests -t .    # testes sem internet (motor e Telegram simulados)
 ```
-
-Os testes usam um motor, um geocodificador e um Telegram falsos, então não precisam de internet.
-
-## Estrutura
 
 ```
 prospecta/
-  bot.py        bot do Telegram: comandos, botões, fila de buscas, mini-CRM
-  busca.py      orquestra a busca: cobertura do raio, junção, filtros, enriquecimento, nota
-  motor.py      cliente da API do google-maps-scraper-kit
+  __main__.py   linha de comando (instalar, buscar, motor, perfis, verificar, bot)
+  kit.py        baixa e liga o motor do google-maps-scraper-kit
+  busca.py      cobertura do raio, junção, filtros, enriquecimento e nota
+  motor.py      cliente da API do motor
   geo.py        distância, malha de cobertura, geocodificação (ViaCEP + Nominatim)
   telefone.py   telefones brasileiros, celular x fixo, links wa.me
-  sites.py      leitura dos sites para achar WhatsApp (bloqueia endereços de rede interna)
+  sites.py      lê os sites atrás de WhatsApp (bloqueia endereços de rede interna)
   qualifica.py  nota de prioridade
-  rotas.py      rota otimizada, links Google Maps / Waze, OSRM opcional
+  rotas.py      rota otimizada e links Google Maps / Waze
+  relatorio.py  relatório HTML
   exporta.py    planilha XLSX/CSV e mapa KML
-  banco.py      SQLite: preferências, buscas e status dos prospects
-  perfis.json   serviços prontos (edite à vontade)
+  banco.py      histórico e status dos contatos (SQLite)
+  bot.py, telegram.py   bot de Telegram opcional
+  perfis.json   serviços prontos
 ```

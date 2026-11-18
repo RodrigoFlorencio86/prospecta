@@ -56,6 +56,10 @@ class Banco:
         with self.trava, self.con:
             self.con.executescript(ESQUEMA)
 
+    def fechar(self):
+        with self.trava:
+            self.con.close()
+
     # ── preferências ──
     def chat(self, chat_id):
         with self.trava:

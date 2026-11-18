@@ -5,13 +5,14 @@ import urllib.parse
 import urllib.request
 
 AGENTE = "prospecta-bot/1.0 (+https://github.com/RodrigoFlorencio86/AI-Stuff)"
+_DIRETO = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # localhost não passa por HTTP_PROXY
 
 
 class ErroRede(RuntimeError):
     pass
 
 
-def pedir(url, metodo="GET", corpo=None, cabecalhos=None, tempo=20, limite=5_000_000):
+def pedir(url, metodo="GET", corpo=None, cabecalhos=None, tempo=20, limite=5_000_000, direto=False):
     """-> (status, bytes). Lança ErroRede para falhas de conexão; HTTP 4xx/5xx voltam como status."""
     dados = json.dumps(corpo).encode() if isinstance(corpo, (dict, list)) else corpo
     h = {"User-Agent": AGENTE, "Accept": "application/json, */*"}
@@ -20,7 +21,8 @@ def pedir(url, metodo="GET", corpo=None, cabecalhos=None, tempo=20, limite=5_000
     h.update(cabecalhos or {})
     req = urllib.request.Request(url, data=dados, headers=h, method=metodo)
     try:
-        with urllib.request.urlopen(req, timeout=tempo) as r:
+        abrir = _DIRETO.open if direto else urllib.request.urlopen
+        with abrir(req, timeout=tempo) as r:
             return r.status, r.read(limite)
     except urllib.error.HTTPError as e:
         return e.code, e.read(limite)

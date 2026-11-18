@@ -28,12 +28,14 @@ class Motor:
         self.intervalo = intervalo
         partes = urllib.parse.urlsplit(self.url)
         self.cab = {"Host": f"localhost:{partes.port or 80}"}
+        self.direto = (partes.hostname or "") in ("localhost", "127.0.0.1", "::1")
         if chave:
             self.cab["X-API-Key"] = chave
 
     def _pedir(self, metodo, caminho, corpo=None, tempo=30):
         try:
-            return rede.pedir(self.url + caminho, metodo, corpo, self.cab, tempo=tempo, limite=200_000_000)
+            return rede.pedir(self.url + caminho, metodo, corpo, self.cab, tempo=tempo, limite=200_000_000,
+                              direto=self.direto)
         except rede.ErroRede as e:
             raise ErroMotor(f"não consegui falar com o motor de busca em {self.url} ({e}). Ele está ligado?") from e
 
