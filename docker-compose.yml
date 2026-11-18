@@ -1,0 +1,33 @@
+# Sobe tudo com: docker compose up -d --build
+# - motor: o motor de busca do google-maps-scraper-kit (Chrome sem janela), só na rede interna
+# - bot:   o bot do Telegram, que conversa com o motor e com a API do Telegram (long polling,
+#          não precisa de IP público nem de porta aberta)
+services:
+  motor:
+    build:
+      # versão testada do kit; troque por outro commit ou tag quando quiser atualizar
+      context: https://github.com/mahanaicoach/google-maps-scraper-kit.git#${KIT_VERSAO:-446f231e66ba787465bb70dad2a416feec18dad3}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 20s
+    shm_size: 1gb
+    environment:
+      SCRAPER_API_KEY: ${MOTOR_CHAVE:-}
+      SCRAPER_NO_UPDATE_CHECK: "1"
+    volumes:
+      - motor_dados:/kit/.engine/data
+
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MOTOR_URL: http://motor:8080
+      PASTA_DADOS: /dados
+    volumes:
+      - bot_dados:/dados
+    depends_on: [motor]
+
+volumes:
+  motor_dados:
+  bot_dados:

@@ -1,0 +1,98 @@
+{
+  "refrigeracao": {
+    "nome": "Refrigeração comercial",
+    "descricao": "Manutenção de geladeiras, freezers, câmaras frias e expositores",
+    "alvos": ["padaria", "sorveteria", "açaiteria", "açougue", "peixaria", "supermercado", "mercadinho", "hortifruti",
+              "distribuidora de bebidas", "adega", "loja de conveniência", "restaurante", "lanchonete", "bar", "laticínio"],
+    "sinais": ["freezer", "geladeira", "refrigera", "gelad", "quente", "derretid", "câmara fria", "temperatura"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Atendemos estabelecimentos aqui em {bairro} com manutenção preventiva e corretiva de geladeiras, freezers e câmaras frias. Posso passar aí para uma avaliação sem custo?"
+  },
+  "climatizacao": {
+    "nome": "Ar-condicionado e climatização",
+    "descricao": "Instalação, limpeza (PMOC) e manutenção de ar-condicionado",
+    "alvos": ["clínica médica", "consultório odontológico", "academia", "escritório de contabilidade", "escritório de advocacia",
+              "loja de roupas", "salão de beleza", "restaurante", "laboratório de análises clínicas", "escola", "hotel", "farmácia"],
+    "sinais": ["calor", "abafado", "quente", "ar condicionado", "ar-condicionado", "ventila", "climatiza"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Fazemos instalação, higienização e PMOC de ar-condicionado para empresas em {bairro}. Posso enviar uma proposta de manutenção preventiva?"
+  },
+  "limpeza": {
+    "nome": "Limpeza e conservação",
+    "descricao": "Limpeza comercial, pós-obra e terceirização de equipe",
+    "alvos": ["escritório", "clínica médica", "consultório odontológico", "academia", "escola", "condomínio", "coworking",
+              "loja", "concessionária", "hotel", "pousada", "igreja"],
+    "sinais": ["sujo", "sujeira", "limpeza", "banheiro", "cheiro", "higiene", "imundo"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Cuidamos da limpeza de empresas em {bairro}, com equipe treinada e material incluso. Posso fazer um orçamento sem compromisso?"
+  },
+  "dedetizacao": {
+    "nome": "Dedetização e controle de pragas",
+    "descricao": "Controle de pragas, descupinização, limpeza de caixa d'água",
+    "alvos": ["restaurante", "lanchonete", "padaria", "pizzaria", "hotel", "pousada", "escola", "creche", "supermercado",
+              "condomínio", "clínica veterinária", "depósito"],
+    "sinais": ["barata", "rato", "inseto", "mosca", "formiga", "praga", "bicho"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Fazemos controle de pragas com certificado para vigilância sanitária, aqui em {bairro}. Posso agendar uma visita técnica?"
+  },
+  "extintores": {
+    "nome": "Prevenção de incêndio",
+    "descricao": "Recarga de extintores, AVCB/CLCB, brigada e sinalização",
+    "alvos": ["restaurante", "bar", "padaria", "posto de combustível", "oficina mecânica", "escola", "academia", "hotel",
+              "galpão", "supermercado", "igreja", "casa de festas"],
+    "sinais": ["incêndio", "extintor", "segurança", "fogo"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Fazemos recarga de extintores e regularização do AVCB para empresas em {bairro}. Posso verificar a validade dos seus extintores?"
+  },
+  "seguranca": {
+    "nome": "Segurança eletrônica",
+    "descricao": "CFTV, alarme monitorado, controle de acesso",
+    "alvos": ["loja", "farmácia", "posto de combustível", "condomínio", "escritório", "loja de celulares", "ótica", "joalheria",
+              "depósito", "oficina mecânica", "supermercado", "escola"],
+    "sinais": ["assalt", "roubo", "furto", "segurança", "câmera", "inseguro"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Instalamos câmeras e alarme monitorado para comércios em {bairro}. Posso fazer uma avaliação gratuita do seu ponto?"
+  },
+  "ti": {
+    "nome": "Suporte de TI e redes",
+    "descricao": "Suporte técnico, redes, Wi-Fi, backup e computadores",
+    "alvos": ["escritório de contabilidade", "escritório de advocacia", "clínica médica", "consultório odontológico",
+              "imobiliária", "escola", "laboratório", "corretora de seguros", "agência de viagens", "coworking"],
+    "sinais": ["sistema", "internet", "wi-fi", "wifi", "computador", "demora", "fora do ar"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Damos suporte de TI para empresas em {bairro}: redes, Wi-Fi, backup e manutenção de computadores. Posso entender como está a estrutura de vocês hoje?"
+  },
+  "contabilidade": {
+    "nome": "Contabilidade e BPO financeiro",
+    "descricao": "Contabilidade para MEI, ME e pequenas empresas",
+    "alvos": ["salão de beleza", "barbearia", "pet shop", "loja de roupas", "restaurante", "lanchonete", "academia",
+              "estúdio de pilates", "oficina mecânica", "clínica de estética", "papelaria", "loja de materiais de construção"],
+    "sinais": [],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Atendemos pequenas empresas de {bairro} com contabilidade e organização financeira. Posso mostrar como reduzir impostos e tempo com burocracia?"
+  },
+  "marketing": {
+    "nome": "Marketing digital",
+    "descricao": "Redes sociais, Google Meu Negócio, sites e tráfego pago",
+    "alvos": ["restaurante", "pizzaria", "hamburgueria", "salão de beleza", "barbearia", "clínica de estética", "academia",
+              "pet shop", "loja de roupas", "imobiliária", "consultório odontológico", "escola de idiomas"],
+    "sinais": ["atendimento", "demora", "não responde", "telefone"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Ajudamos negócios de {bairro} a atrair mais clientes pelo Google e Instagram. Posso mandar uma análise gratuita do perfil de vocês?"
+  },
+  "manutencao_predial": {
+    "nome": "Manutenção predial",
+    "descricao": "Elétrica, hidráulica, pintura e pequenos reparos",
+    "alvos": ["condomínio", "escola", "clínica médica", "hotel", "pousada", "restaurante", "academia", "igreja", "escritório",
+              "loja", "supermercado", "galpão"],
+    "sinais": ["vazamento", "goteira", "infiltra", "lâmpada", "quebrad", "mofo", "manutenção"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Fazemos manutenção elétrica, hidráulica e pequenos reparos para empresas e condomínios em {bairro}. Posso deixar meu contato para quando precisarem?"
+  },
+  "coifas": {
+    "nome": "Coifas e cozinhas industriais",
+    "descricao": "Limpeza de coifas e dutos, manutenção de fornos e fogões industriais",
+    "alvos": ["restaurante", "pizzaria", "hamburgueria", "churrascaria", "padaria", "lanchonete", "cozinha industrial",
+              "hotel", "buffet", "pastelaria", "restaurante japonês", "marmitaria"],
+    "sinais": ["fumaça", "cheiro de gordura", "gordura", "forno", "fogão", "coifa"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Fazemos limpeza de coifas e dutos e manutenção de equipamentos de cozinha industrial em {bairro}. Posso agendar uma vistoria?"
+  },
+  "lavanderia": {
+    "nome": "Lavanderia e enxoval",
+    "descricao": "Lavanderia industrial, locação de enxoval e uniformes",
+    "alvos": ["hotel", "pousada", "motel", "clínica de estética", "salão de beleza", "barbearia", "academia", "restaurante",
+              "clínica veterinária", "spa", "hostel", "consultório odontológico"],
+    "sinais": ["toalha", "lençol", "roupa de cama", "limpeza", "cheiro"],
+    "mensagem": "Olá, equipe {prospect}! Aqui é {meu_nome}, da {minha_empresa}. Cuidamos da lavagem de toalhas, lençóis e uniformes de empresas em {bairro}, com coleta e entrega. Posso enviar uma tabela de preços?"
+  }
+}

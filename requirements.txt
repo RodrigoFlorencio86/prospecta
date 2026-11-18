@@ -1,0 +1,2 @@
+# Opcional: sem ele a planilha sai em CSV (abre no Excel do mesmo jeito).
+openpyxl==3.1.5
