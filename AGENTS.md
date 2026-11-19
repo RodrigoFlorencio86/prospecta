@@ -25,8 +25,13 @@ Depois da instalação, ofereça ao usuário três jeitos de seguir:
 
 - **Painel no navegador**: `python3 -m prospecta painel` (deixa o terminal ocupado; rode em segundo
   plano se puder). Tem busca, mapa, contatos e um assistente que usa o plano do ChatGPT dele.
-- **Ferramentas MCP no Claude Code ou no Codex**: `python3 -m prospecta conectar claude` (ou
-  `codex`). Depois, reinicie o agente.
+- **Ferramentas MCP no app do Claude, no Claude Code ou no Codex**:
+  - app Claude para desktop: `python3 -m prospecta conectar claude-desktop`; depois, o usuário fecha
+    o Claude por completo e abre de novo;
+  - Claude Code: `python3 -m prospecta conectar claude`;
+  - Codex: `python3 -m prospecta conectar codex`.
+
+  Depois de conectar, reinicie o aplicativo.
 - **Você mesmo roda as buscas**, pelos comandos abaixo.
 
 - Sem Python: oriente a instalar em https://www.python.org/downloads/ (no Windows, marcar "Add
@@ -141,7 +146,7 @@ O comando cria uma pasta em `resultados/<data>_<serviço>_<local>_<n>/` com:
 ```
 python3 -m prospecta instalar [--sem-painel] | verificar | perfis [--json]
 python3 -m prospecta painel [--porta N] [--nao-abrir]
-python3 -m prospecta conectar claude|codex     # registra o servidor MCP
+python3 -m prospecta conectar claude|claude-desktop|codex [--remover]   # registra o servidor MCP
 python3 -m prospecta chatgpt status|sair       # conta do ChatGPT do assistente do painel
 python3 -m prospecta motor ligar|desligar|status|reiniciar
 python3 -m prospecta buscar ENDEREÇO [--raio KM] (--perfil CHAVE | --alvos "a, b") [--servico ...]

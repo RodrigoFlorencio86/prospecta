@@ -5,7 +5,7 @@
     python -m prospecta buscar "Rua X, 100, Campinas" --raio 3 --perfil climatizacao
     python -m prospecta buscar "13010-001" --alvos "padaria, hotel" --empresa "Ana | Frio Total"
     python -m prospecta perfis [--json]              # serviços prontos
-    python -m prospecta conectar claude|codex        # liga o Prospecta ao Claude Code ou ao Codex (MCP)
+    python -m prospecta conectar claude|claude-desktop|codex  # liga o Prospecta ao Claude Code, Claude Desktop ou Codex (MCP)
     python -m prospecta mcp                          # servidor MCP (quem roda é o Claude Code / Codex)
     python -m prospecta chatgpt status|sair          # conta do ChatGPT usada no chat do painel
     python -m prospecta motor ligar|desligar|status
@@ -69,6 +69,7 @@ def cmd_instalar(cfg, a):
         print(f"✓ criei {env} (coloque seu e-mail em CONTATO_GEOCODER)")
     print("\nPronto. Para usar:\n"
           "  • painel no navegador:  python -m prospecta painel\n"
+          "  • no app do Claude:     python -m prospecta conectar claude-desktop\n"
           "  • no Claude Code:       python -m prospecta conectar claude\n"
           "  • pela linha de comando: python -m prospecta buscar \"Rua X, 100, Sua Cidade\" --raio 3 --perfil limpeza")
     if not a.sem_painel:
@@ -185,8 +186,14 @@ def cmd_mcp(cfg, _a):
 
 
 def cmd_conectar(cfg, a):
-    """Registra o servidor MCP no Claude Code ou no Codex, com caminhos absolutos."""
+    """Registra o servidor MCP no Claude Code, no Claude Desktop ou no Codex, com caminhos absolutos."""
+    if a.cliente == "claude-desktop":
+        return _conectar_desktop(a.remover)
     lancador = str((RAIZ / "mcp.py").resolve())
+    if a.remover:
+        cmd = ["claude", "mcp", "remove", "--scope", "user", "prospecta"] if a.cliente == "claude" else \
+            ["codex", "mcp", "remove", "prospecta"]
+        return subprocess.run(cmd).returncode if shutil.which(cmd[0]) else 1
     if a.cliente == "claude":
         cmd = ["claude", "mcp", "add", "--scope", "user", "prospecta", "--", sys.executable, lancador]
     else:
@@ -201,6 +208,29 @@ def cmd_conectar(cfg, a):
         print(f"✓ pronto: abra o {'Claude Code' if a.cliente == 'claude' else 'Codex'} e peça, por exemplo, "
               "\"procure padarias num raio de 2 km da Rua X, 100, Campinas\".")
     return r.returncode
+
+
+def _conectar_desktop(remover=False):
+    from . import desktop
+    try:
+        feitos = desktop.desconectar() if remover else desktop.conectar()
+    except (desktop.ErroDesktop, OSError) as ex:
+        sys.exit(f"✗ {ex}")
+    if remover:
+        print("\n".join(f"✓ removido de {c}" for c, _ in feitos) or "O Prospecta não estava no Claude Desktop.")
+        return 0
+    for caminho, estado in feitos:
+        print({"adicionado": "✓ Prospecta adicionado", "atualizado": "✓ Prospecta atualizado",
+               "igual": "✓ Prospecta já estava configurado"}[estado] + f" em {caminho}")
+    e = desktop.entrada()
+    print(f"   comando: {e['command']} {e['args'][0]}")
+    print("\nAgora feche o Claude Desktop por completo (no Mac: Claude > Sair; no Windows: clique com o botão\n"
+          "direito no ícone perto do relógio > Sair) e abra de novo. Para conferir: no chat, clique em \"+\"\n"
+          "> Conectores; o \"prospecta\" deve aparecer com as ferramentas. Depois é só pedir, por exemplo:\n"
+          "\"procure padarias num raio de 2 km da Rua X, 100, Campinas\".")
+    if sys.platform.startswith("linux"):
+        print("\nObs.: no Linux o caminho do arquivo pode variar conforme a versão do app.")
+    return 0
 
 
 def _q(s):
@@ -254,8 +284,9 @@ def main(argv=None):
     pn.add_argument("--nao-abrir", action="store_true", help="não abrir o navegador")
     sub.add_parser("mcp", help="servidor MCP (stdio) para Claude Code / Codex")
     sub.add_parser("trabalhar", help=argparse.SUPPRESS)
-    c = sub.add_parser("conectar", help="registra o Prospecta no Claude Code ou no Codex")
-    c.add_argument("cliente", choices=["claude", "codex"])
+    c = sub.add_parser("conectar", help="registra o Prospecta no Claude Code, no Claude Desktop ou no Codex")
+    c.add_argument("cliente", choices=["claude", "claude-desktop", "codex"])
+    c.add_argument("--remover", action="store_true", help="tira o Prospecta desse aplicativo")
     g = sub.add_parser("chatgpt", help="conta do ChatGPT do chat do painel")
     g.add_argument("acao", choices=["status", "sair"])
     m = sub.add_parser("motor", help="liga, desliga ou mostra o motor de busca")

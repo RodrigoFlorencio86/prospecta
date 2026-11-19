@@ -63,18 +63,27 @@ Abre `http://127.0.0.1:8765` no seu navegador, servido pelo seu próprio computa
   acompanha e limita o uso em [ChatGPT → Configurações → Uso](https://chatgpt.com/settings/usage).
   Sem conta do ChatGPT, o painel funciona igual, só sem o assistente.
 
-### 2. Claude Code ou Codex (MCP)
+### 2. No app do Claude, no Claude Code ou no Codex (MCP)
 
-O Prospecta vira um conjunto de ferramentas dentro do seu agente:
+O Prospecta vira um conjunto de ferramentas dentro do aplicativo de IA que você já usa, com a sua
+assinatura:
 
 ```bash
-python3 -m prospecta conectar claude   # ou: conectar codex
+python3 -m prospecta conectar claude-desktop   # app Claude para desktop (Mac e Windows)
+python3 -m prospecta conectar claude           # Claude Code
+python3 -m prospecta conectar codex            # Codex
 ```
 
-Depois é só conversar no Claude Code (ou no Codex), por exemplo: *"procure escritórios e clínicas
-num raio de 2 km da Rua X, 100, Campinas e me mostre os 10 melhores com WhatsApp"*. O agente usa as
-mesmas ferramentas do painel: buscar, acompanhar, filtrar, marcar status, montar rota e mensagem,
-exportar. As buscas feitas por ele aparecem também no painel.
+**App Claude para desktop:** depois do comando, feche o Claude por completo (no Mac, Claude → Sair; no
+Windows, clique com o botão direito no ícone perto do relógio → Sair) e abra de novo. Para conferir,
+clique em **+** no chat → **Conectores**: o `prospecta` deve aparecer. O comando acrescenta o
+Prospecta ao `claude_desktop_config.json` sem mexer nos outros servidores e guarda uma cópia do
+arquivo original. Para tirar: `python3 -m prospecta conectar claude-desktop --remover`.
+
+Depois é só conversar, por exemplo: *"procure escritórios e clínicas num raio de 2 km da Rua X, 100,
+Campinas e me mostre os 10 melhores com WhatsApp"*. O Claude usa as mesmas ferramentas do painel:
+buscar, acompanhar, filtrar, marcar status, montar rota e mensagem, exportar. As buscas feitas por
+ele aparecem também no painel.
 
 Abrindo o Claude Code dentro desta pasta, o arquivo `.mcp.json` já oferece o servidor `prospecta`
 (o Claude Code pede para você aprovar na primeira vez).
