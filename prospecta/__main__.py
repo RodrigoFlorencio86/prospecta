@@ -50,8 +50,8 @@ def _app(cfg, **k):
 
 def cmd_instalar(cfg, a):
     print(f"Python {sys.version.split()[0]} ✓")
-    if sys.version_info < (3, 9):
-        sys.exit("✗ Precisa de Python 3.9 ou mais novo: https://www.python.org/downloads/")
+    if sys.version_info < (3, 10):
+        sys.exit("✗ Precisa de Python 3.10 ou mais novo: https://www.python.org/downloads/")
     try:
         import openpyxl  # noqa: F401
         print("openpyxl ✓ (planilha em .xlsx)")

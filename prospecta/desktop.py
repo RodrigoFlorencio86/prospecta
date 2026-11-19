@@ -22,7 +22,7 @@ def caminhos_config():
     casa = Path.home()
     if sys.platform == "darwin":
         return [casa / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"]
-    if os.name == "nt":
+    if sys.platform == "win32":
         appdata = Path(os.environ.get("APPDATA") or casa / "AppData" / "Roaming")
         saida = [appdata / "Claude" / "claude_desktop_config.json"]
         # versão da Microsoft Store (MSIX): a pasta "Roaming" fica virtualizada dentro do pacote

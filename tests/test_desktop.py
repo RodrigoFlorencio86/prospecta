@@ -90,7 +90,9 @@ class DesktopTest(unittest.TestCase):
         with mock.patch.object(sys, "platform", "darwin"):
             self.assertIn("Library/Application Support/Claude", desktop.caminhos_config()[0].as_posix())
         with mock.patch.object(sys, "platform", "linux"), mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": "/x"}):
-            self.assertEqual(desktop.caminhos_config()[0].as_posix(), "/x/Claude/claude_desktop_config.json")
+            self.assertTrue(desktop.caminhos_config()[0].as_posix().endswith("/x/Claude/claude_desktop_config.json"))
+        with mock.patch.object(sys, "platform", "win32"), mock.patch.dict(os.environ, {"APPDATA": "/ap"}):
+            self.assertTrue(desktop.caminhos_config()[0].as_posix().endswith("/ap/Claude/claude_desktop_config.json"))
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ o usuário ver tudo com mapa e botões, ofereça também o painel: `python3 -m p
 ## 1. Instalação (uma vez)
 
 ```bash
-python3 --version              # precisa ser 3.9 ou mais novo
+python3 --version              # precisa ser 3.10 ou mais novo
 python3 -m prospecta instalar --sem-painel   # baixa o motor de busca, liga e confere
 ```
 

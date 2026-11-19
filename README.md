@@ -46,7 +46,7 @@ não apaga nada disso. Para ver o mapa e os botões, peça ao Claude: *"abra o p
 
 ## Outros jeitos de usar
 
-Instale uma vez (precisa de **Python 3.9+** — [download](https://www.python.org/downloads/); no
+Instale uma vez (precisa de **Python 3.10+** — [download](https://www.python.org/downloads/); no
 Windows, marque "Add python.exe to PATH" e troque `python3` por `py` nos comandos):
 
 ```bash
