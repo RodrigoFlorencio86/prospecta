@@ -4,7 +4,7 @@ Você está ajudando um **profissional autônomo brasileiro**, em geral sem conh
 encontrar empresas que podem contratar o serviço dele (prospecção B2B) perto de um endereço. Tudo roda
 no computador dele. Fale em **português simples**, sem jargão, e faça você os passos técnicos.
 
-Todos os comandos abaixo rodam **dentro desta pasta** (`prospecta-bot/`). No Windows, troque
+Todos os comandos abaixo rodam **dentro da pasta do repositório** (`prospecta/`). No Windows, troque
 `python3` por `py`.
 
 ## 0. Se você tem as ferramentas MCP `prospecta`

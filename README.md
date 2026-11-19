@@ -29,8 +29,9 @@ que faz as buscas e organiza os contatos por você.
 
 Para quem assina o Claude e usa o app para computador (Mac ou Windows):
 
-1. Baixe o arquivo `prospecta-<versão>.mcpb`. Para gerá-lo, rode
-   `python3 -m prospecta empacotar-extensao`; ele fica na pasta `dist/`.
+1. Baixe o arquivo `prospecta-<versão>.mcpb` na página de
+   [Releases](https://github.com/RodrigoFlorencio86/prospecta/releases) deste repositório. Se preferir
+   gerar você mesmo, rode `python3 -m prospecta empacotar-extensao`; o arquivo fica na pasta `dist/`.
 2. No app Claude, vá em **Configurações → Extensões → Configurações avançadas → Instalar extensão…** e
    escolha o arquivo. Dois cliques no arquivo também costumam funcionar.
 3. Na tela da extensão, escolha (se quiser) a pasta dos resultados e informe seu e-mail para o serviço
@@ -49,8 +50,8 @@ Instale uma vez (precisa de **Python 3.9+** — [download](https://www.python.or
 Windows, marque "Add python.exe to PATH" e troque `python3` por `py` nos comandos):
 
 ```bash
-git clone https://github.com/RodrigoFlorencio86/AI-Stuff.git
-cd AI-Stuff/prospecta-bot
+git clone https://github.com/RodrigoFlorencio86/prospecta.git
+cd prospecta
 python3 -m prospecta instalar          # baixa o motor de busca, confere tudo e abre o painel
 ```
 
@@ -112,7 +113,7 @@ Não quer digitar comando nenhum? Abra o Claude Code, o Codex, o Cursor ou o Gem
 qualquer e cole, trocando o que está entre colchetes:
 
 ```text
-Clone https://github.com/RodrigoFlorencio86/AI-Stuff e siga o arquivo prospecta-bot/AGENTS.md
+Clone https://github.com/RodrigoFlorencio86/prospecta e siga o arquivo AGENTS.md
 para instalar e me ajudar a encontrar clientes. Eu trabalho com [seu serviço, ex.: manutenção de
 ar-condicionado] e minha empresa fica em [endereço ou CEP]. Quero procurar num raio de [3] km.
 Meu nome e empresa para as mensagens: [Seu Nome | Sua Empresa].
@@ -259,6 +260,10 @@ O Prospecta é gratuito. Se ele for útil no seu trabalho, ou se você criar alg
 **dê crédito ao autor**: cite o Rodrigo Florencio e o link deste repositório no seu README, site ou
 aplicação. O motor de busca usado por baixo é o
 [google-maps-scraper-kit](https://github.com/mahanaicoach/google-maps-scraper-kit) (licença MIT).
+
+## Licença
+
+[MIT](LICENSE) © Rodrigo Florencio. Pode usar, alterar e redistribuir, mantendo o aviso de autoria.
 
 ## Para desenvolvedores
 

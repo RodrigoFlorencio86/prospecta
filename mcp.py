@@ -1,7 +1,7 @@
 """Lançador do servidor MCP do Prospecta: funciona de qualquer pasta.
 
-Claude Code:  claude mcp add --scope user prospecta -- python3 /caminho/para/prospecta-bot/mcp.py
-Codex:        codex mcp add prospecta -- python3 /caminho/para/prospecta-bot/mcp.py
+Claude Code:  claude mcp add --scope user prospecta -- python3 /caminho/para/prospecta/mcp.py
+Codex:        codex mcp add prospecta -- python3 /caminho/para/prospecta/mcp.py
 (ou simplesmente: python3 -m prospecta conectar claude|codex)"""
 import os
 import sys

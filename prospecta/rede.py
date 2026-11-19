@@ -4,7 +4,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-AGENTE = "prospecta-bot/1.0 (+https://github.com/RodrigoFlorencio86/AI-Stuff)"
+AGENTE = "prospecta/1.0 (+https://github.com/RodrigoFlorencio86/prospecta)"
 _DIRETO = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # localhost não passa por HTTP_PROXY
 
 

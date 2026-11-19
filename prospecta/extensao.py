@@ -15,7 +15,7 @@ from .config import RAIZ
 from .ferramentas import FERRAMENTAS
 
 AUTOR = {"name": "Rodrigo Florencio", "url": "https://www.linkedin.com/in/rodrigoflorencio/"}
-REPOSITORIO = "https://github.com/RodrigoFlorencio86/AI-Stuff"
+REPOSITORIO = "https://github.com/RodrigoFlorencio86/prospecta"
 ICONE = RAIZ / "extensao" / "icon.png"
 IGNORAR = {"__pycache__", ".pytest_cache"}
 VARIAVEL_VALIDA = r"^\$\{(__dirname|pathSeparator|/|user_config\..+)\}$"  # a mesma regra do mcpb oficial
@@ -49,6 +49,8 @@ def manifest():
         "author": AUTOR,
         "repository": {"type": "git", "url": REPOSITORIO},
         "homepage": REPOSITORIO,
+        "support": f"{REPOSITORIO}/issues",
+        "license": "MIT",
         "icon": "icon.png",
         "server": {
             "type": "uv",
