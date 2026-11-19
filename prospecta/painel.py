@@ -5,6 +5,7 @@ Segurança: só escuta em 127.0.0.1; recusa Host e Origin de fora (DNS rebinding
 chamada à API exige o token aleatório desta execução, que só a página do painel conhece."""
 import json
 import mimetypes
+import os
 import re
 import secrets
 import socket
@@ -320,6 +321,12 @@ def criar(cfg, porta=None, app=None, auth=None, agente=None):
 def servir(cfg, porta=None, abrir=True):
     srv = criar(cfg, porta)
     url = f"http://127.0.0.1:{srv.porta}/"
+    marca = Path(cfg.pasta_dados) / "painel.json"  # para a ferramenta abrir_painel achar este painel
+    try:
+        marca.parent.mkdir(parents=True, exist_ok=True)
+        marca.write_text(json.dumps({"url": url, "pid": os.getpid()}), encoding="utf-8")
+    except OSError:
+        pass
     print(f"✓ Painel do Prospecta em {url}\n  (deixe esta janela aberta; Ctrl+C para fechar)")
     if abrir:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
@@ -329,4 +336,8 @@ def servir(cfg, porta=None, abrir=True):
         print("\nPainel fechado. Buscas em andamento continuam em segundo plano.")
     finally:
         srv.server_close()
+        try:
+            marca.unlink()
+        except OSError:
+            pass
     return 0

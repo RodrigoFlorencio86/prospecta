@@ -20,6 +20,28 @@ def carregar_env(caminho=RAIZ / ".env"):
         os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
+def eh_extensao():
+    """Rodando como extensão do Claude Desktop? Lá a pasta do programa é trocada a cada atualização,
+    então os dados vão para ~/Prospecta e os resultados para Documentos/Prospecta."""
+    return os.environ.get("PROSPECTA_EXTENSAO") == "1"
+
+
+def pasta_base():
+    return Path.home() / "Prospecta" if eh_extensao() else RAIZ
+
+
+def _documentos():
+    if os.name != "nt":
+        try:  # Linux com pastas localizadas (ex.: ~/Documentos)
+            import subprocess
+            r = subprocess.run(["xdg-user-dir", "DOCUMENTS"], capture_output=True, text=True, timeout=3)
+            if r.returncode == 0 and r.stdout.strip() and Path(r.stdout.strip()) != Path.home():
+                return Path(r.stdout.strip())
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return Path.home() / "Documents"
+
+
 def _ids(texto):
     return {int(x) for x in (texto or "").replace(";", ",").split(",") if x.strip().lstrip("-").isdigit()}
 
@@ -41,14 +63,20 @@ class Config:
     @classmethod
     def do_ambiente(cls):
         carregar_env()
-        e = os.environ.get
+
+        def e(chave, padrao=None):
+            # um campo opcional da extensão do Claude Desktop deixado em branco pode chegar como "${user_config.x}"
+            v = os.environ.get(chave)
+            return padrao if v is None or v.strip() == "" or v.startswith("${") else v
+
         return cls(
             telegram_token=e("TELEGRAM_TOKEN", ""),
             usuarios_permitidos=_ids(e("USUARIOS_PERMITIDOS", "")),
             motor_url=e("MOTOR_URL", "http://localhost:8080").rstrip("/"),
             motor_chave=e("MOTOR_CHAVE", ""),
-            pasta_dados=Path(e("PASTA_DADOS", str(RAIZ / "dados"))),
-            pasta_resultados=Path(e("PASTA_RESULTADOS", str(RAIZ / "resultados"))),
+            pasta_dados=Path(e("PASTA_DADOS", str(pasta_base() / "dados"))),
+            pasta_resultados=Path(e("PASTA_RESULTADOS", str(_documentos() / "Prospecta" if eh_extensao()
+                                                          else RAIZ / "resultados"))),
             nominatim_url=e("NOMINATIM_URL", "https://nominatim.openstreetmap.org").rstrip("/"),
             contato_geocoder=e("CONTATO_GEOCODER", ""),
             osrm_url=e("OSRM_URL", "").rstrip("/"),

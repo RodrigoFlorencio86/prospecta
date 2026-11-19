@@ -25,7 +25,25 @@ que faz as buscas e organiza os contatos por você.
 - **Só os novos**: na busca do mês seguinte, `--so-novos` mostra só as empresas que você ainda não
   tinha.
 
-## Três jeitos de usar
+## Jeito mais fácil: extensão do app Claude (sem instalar Python)
+
+Para quem assina o Claude e usa o app para computador (Mac ou Windows):
+
+1. Baixe o arquivo `prospecta-<versão>.mcpb`. Para gerá-lo, rode
+   `python3 -m prospecta empacotar-extensao`; ele fica na pasta `dist/`.
+2. No app Claude, vá em **Configurações → Extensões → Configurações avançadas → Instalar extensão…** e
+   escolha o arquivo. Dois cliques no arquivo também costumam funcionar.
+3. Na tela da extensão, escolha (se quiser) a pasta dos resultados e informe seu e-mail para o serviço
+   de mapas. Ative a extensão.
+4. Converse: *"Trabalho com manutenção de ar-condicionado. Procure clínicas e escritórios num raio de
+   2 km da Rua X, 100, Campinas"*.
+
+O próprio app instala o Python e o que mais for preciso. Na primeira busca, o Prospecta baixa o motor
+de busca, o que leva alguns minutos. Seus dados ficam na pasta `Prospecta`, dentro da sua pasta de
+usuário, e os relatórios e planilhas em **Documentos → Prospecta**. Atualizar ou remover a extensão
+não apaga nada disso. Para ver o mapa e os botões, peça ao Claude: *"abra o painel"*.
+
+## Outros jeitos de usar
 
 Instale uma vez (precisa de **Python 3.9+** — [download](https://www.python.org/downloads/); no
 Windows, marque "Add python.exe to PATH" e troque `python3` por `py` nos comandos):
@@ -227,11 +245,30 @@ Comandos do bot:
 | `/novos` | Mostra só empresas que você ainda não recebeu |
 | `/config`, `/cancelar` | Ver configurações e cancelar a busca em andamento |
 
+## Autor
+
+**Rodrigo Florencio** é especialista em Inteligência Artificial pelo PECE-USP, professor convidado no MBA
+de Inteligência Artificial Aplicada a Negócios da FAAP e fundador da [GenSearch Me](https://www.gensearch.me/),
+startup de monitoramento e visibilidade de produtos e marcas de saúde nas IAs.
+
+- LinkedIn: [rodrigoflorencio](https://www.linkedin.com/in/rodrigoflorencio/)
+
+### Crédito ao usar
+
+O Prospecta é gratuito. Se ele for útil no seu trabalho, ou se você criar algo a partir dele, por favor
+**dê crédito ao autor**: cite o Rodrigo Florencio e o link deste repositório no seu README, site ou
+aplicação. O motor de busca usado por baixo é o
+[google-maps-scraper-kit](https://github.com/mahanaicoach/google-maps-scraper-kit) (licença MIT).
+
 ## Para desenvolvedores
 
 ```bash
 python3 -m unittest discover -s tests -t .    # testes sem internet (motor, OpenAI e Telegram simulados)
+python3 -m prospecta empacotar-extensao       # gera dist/prospecta-<versão>.mcpb (extensão do Claude Desktop)
 ```
+
+A extensão segue o formato [MCP Bundle](https://github.com/modelcontextprotocol/mcpb), versão 0.4 do
+manifesto, com o tipo `uv`. Os arquivos-fonte ficam em `prospecta/extensao.py` e `extensao/icon.png`.
 
 ```
 prospecta/
@@ -251,7 +288,9 @@ prospecta/
   painel.py, painel.html  painel local no navegador
   chatgpt.py    "Sign in with ChatGPT": OAuth PKCE, validação RS256, renovação e revogação
   chat.py       assistente: API Responses (streaming) com as ferramentas do Prospecta
-  mcp_servidor.py  servidor MCP (stdio) para Claude Code e Codex
+  mcp_servidor.py  servidor MCP (stdio) para Claude Code, Claude Desktop e Codex
+  extensao.py   gera a extensão do Claude Desktop (.mcpb)
+  desktop.py    registra o servidor no claude_desktop_config.json (conectar claude-desktop)
   bot.py, telegram.py   bot de Telegram opcional
   perfis.json   serviços prontos
 ```

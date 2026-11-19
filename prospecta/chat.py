@@ -17,6 +17,7 @@ API = "https://api.openai.com/v1"
 MAX_RODADAS = 10
 MAX_SAIDA_FERRAMENTA = 12_000
 MAX_ITENS_HISTORICO = 80
+SO_FORA_DO_PAINEL = {"abrir_painel"}  # o chat já está dentro do painel
 FERRAMENTAS_QUE_MUDAM = {"iniciar_busca", "cancelar_busca", "marcar_prospect", "configurar", "exportar"}
 
 
@@ -30,7 +31,7 @@ def namespace_ferramentas():
     return [{"type": "namespace", "name": "prospecta",
              "description": "Ferramentas do Prospecta: buscar empresas num raio, consultar e acompanhar prospects.",
              "tools": [{"type": "function", "name": f["nome"], "description": f["descricao"], "parameters": schema(f)}
-                       for f in FERRAMENTAS]}]
+                       for f in FERRAMENTAS if f["nome"] not in SO_FORA_DO_PAINEL]}]
 
 
 def instrucoes(config):

@@ -4,3 +4,4 @@ resultados/
 __pycache__/
 *.pyc
 motor/
+dist/

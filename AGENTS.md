@@ -21,6 +21,11 @@ python3 --version              # precisa ser 3.9 ou mais novo
 python3 -m prospecta instalar --sem-painel   # baixa o motor de busca, liga e confere
 ```
 
+Se o usuário usa o **app Claude para desktop** e não quer lidar com terminal, a extensão é o caminho
+mais simples. Rode `python3 -m prospecta empacotar-extensao` e oriente a instalar o arquivo
+`dist/prospecta-<versão>.mcpb` em Configurações → Extensões → Configurações avançadas → "Instalar
+extensão…". A extensão não precisa de Python instalado nem do `instalar`.
+
 Depois da instalação, ofereça ao usuário três jeitos de seguir:
 
 - **Painel no navegador**: `python3 -m prospecta painel` (deixa o terminal ocupado; rode em segundo
@@ -147,6 +152,7 @@ O comando cria uma pasta em `resultados/<data>_<serviço>_<local>_<n>/` com:
 python3 -m prospecta instalar [--sem-painel] | verificar | perfis [--json]
 python3 -m prospecta painel [--porta N] [--nao-abrir]
 python3 -m prospecta conectar claude|claude-desktop|codex [--remover]   # registra o servidor MCP
+python3 -m prospecta empacotar-extensao [--saida ARQ.mcpb]              # extensão do Claude Desktop
 python3 -m prospecta chatgpt status|sair       # conta do ChatGPT do assistente do painel
 python3 -m prospecta motor ligar|desligar|status|reiniciar
 python3 -m prospecta buscar ENDEREÇO [--raio KM] (--perfil CHAVE | --alvos "a, b") [--servico ...]

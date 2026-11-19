@@ -180,6 +180,18 @@ def cmd_trabalhar(cfg, _a):
     return 0
 
 
+def cmd_empacotar(cfg, a):
+    from . import extensao
+    if a.pasta:
+        print(f"✓ arquivos da extensão em {extensao.gravar_pasta(a.pasta)}")
+        return 0
+    destino = extensao.empacotar(a.saida_pacote)
+    print(f"✓ extensão do Claude Desktop: {destino} ({destino.stat().st_size // 1024} KB)\n"
+          "  Para instalar: abra o Claude Desktop > Configurações > Extensões > Configurações avançadas >\n"
+          "  \"Instalar extensão…\" e escolha esse arquivo (ou dê dois cliques nele).")
+    return 0
+
+
 def cmd_mcp(cfg, _a):
     from .mcp_servidor import servir
     return servir(cfg)
@@ -284,6 +296,9 @@ def main(argv=None):
     pn.add_argument("--nao-abrir", action="store_true", help="não abrir o navegador")
     sub.add_parser("mcp", help="servidor MCP (stdio) para Claude Code / Codex")
     sub.add_parser("trabalhar", help=argparse.SUPPRESS)
+    ex = sub.add_parser("empacotar-extensao", help="gera a extensão do Claude Desktop (.mcpb)")
+    ex.add_argument("--saida", dest="saida_pacote", help="arquivo .mcpb a gerar (padrão: dist/prospecta-<versão>.mcpb)")
+    ex.add_argument("--pasta", help="em vez do .mcpb, grava os arquivos numa pasta (para o mcpb oficial)")
     c = sub.add_parser("conectar", help="registra o Prospecta no Claude Code, no Claude Desktop ou no Codex")
     c.add_argument("cliente", choices=["claude", "claude-desktop", "codex"])
     c.add_argument("--remover", action="store_true", help="tira o Prospecta desse aplicativo")
@@ -317,7 +332,8 @@ def main(argv=None):
         cfg.pasta_resultados = Path(a.saida)
     cmds = {"instalar": cmd_instalar, "painel": cmd_painel, "mcp": cmd_mcp, "conectar": cmd_conectar,
             "chatgpt": cmd_chatgpt, "motor": cmd_motor, "perfis": cmd_perfis, "verificar": cmd_verificar,
-            "buscar": cmd_buscar, "bot": cmd_bot, "trabalhar": cmd_trabalhar}
+            "buscar": cmd_buscar, "bot": cmd_bot, "trabalhar": cmd_trabalhar,
+            "empacotar-extensao": cmd_empacotar}
     return cmds[a.cmd](cfg, a) or 0
 
 

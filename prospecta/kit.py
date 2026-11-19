@@ -14,11 +14,13 @@ import zipfile
 from pathlib import Path
 
 from . import rede
-from .config import RAIZ
+from .config import pasta_base
 
 REPO = "https://github.com/mahanaicoach/google-maps-scraper-kit"
 VERSAO = "446f231e66ba787465bb70dad2a416feec18dad3"  # commit testado; troque com cuidado
-PASTA = RAIZ / "motor" / "google-maps-scraper-kit"
+# PROSPECTA_MOTOR_DIR: onde guardar o motor. Padrão: motor/ nesta pasta, ou ~/Prospecta/motor na extensão do
+# Claude Desktop (fora da pasta da extensão, que é trocada a cada atualização)
+PASTA = Path(os.environ.get("PROSPECTA_MOTOR_DIR") or pasta_base() / "motor") / "google-maps-scraper-kit"
 SAIDA_ERRO = "stderr"  # manda a saída do motor para o stderr (o stdout do servidor MCP é só do protocolo)
 
 

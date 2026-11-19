@@ -261,8 +261,11 @@ class Prospecta:
         try:
             if self.ligar_motor:
                 try:
-                    kit.garantir(self.motor, self.cfg.motor_url, log=self.log, saida=kit.SAIDA_ERRO)
-                except kit.ErroKit as ex:
+                    if os.environ.get("PROSPECTA_AUTO_INSTALAR") == "1" and not kit.instalado():
+                        self.db.atualizar_tarefa(tid, mensagem="instalando o motor de busca (só na primeira vez)")
+                        kit.instalar(log=self.log)
+                    kit.garantir(self.motor, self.cfg.motor_url, log=self.log, saida=kit.SAIDA_ERRO, espera=300)
+                except (kit.ErroKit, ErroRede, OSError) as ex:
                     raise ErroMotor(str(ex)) from ex
             busca_id, info = self._rodar(p, progresso, cancelar)
         except Cancelado:
@@ -294,6 +297,38 @@ class Prospecta:
     def rodar(self, params, progresso=None, cancelar=None):
         """Versão síncrona (linha de comando) de uma busca já preparada -> (busca_id, info)."""
         return self._rodar(params, progresso, cancelar or threading.Event())
+
+    # ── painel ──
+    def abrir_painel(self):
+        """Abre o painel no navegador; liga o painel em segundo plano se ele não estiver rodando."""
+        import webbrowser
+        info = self._painel_ativo()
+        if info:
+            webbrowser.open(info["url"])
+            return {"url": info["url"], "situacao": "o painel já estava aberto; abri de novo no navegador"}
+        log = Path(self.cfg.pasta_dados) / "painel.log"
+        log.parent.mkdir(parents=True, exist_ok=True)
+        extra = {"creationflags": 0x00000008 | 0x00000200} if os.name == "nt" else {"start_new_session": True}
+        with open(log, "ab") as saida:
+            subprocess.Popen([sys.executable, "-m", "prospecta", "painel"], cwd=str(RAIZ), stdin=subprocess.DEVNULL,
+                             stdout=saida, stderr=saida, close_fds=True, **extra)
+        fim = time.time() + 15
+        while time.time() < fim:
+            time.sleep(0.4)
+            info = self._painel_ativo()
+            if info:
+                return {"url": info["url"], "situacao": "painel ligado e aberto no navegador"}
+        raise ErroFerramenta(f"o painel não respondeu; veja {log}")
+
+    def _painel_ativo(self):
+        from . import rede
+        arq = Path(self.cfg.pasta_dados) / "painel.json"
+        try:
+            info = json.loads(arq.read_text(encoding="utf-8"))
+            status, corpo = rede.pedir(info["url"], tempo=3, direto=True, limite=200_000)
+        except (OSError, ValueError, KeyError, rede.ErroRede):
+            return None
+        return info if status == 200 and b"<title>Prospecta</title>" in corpo else None
 
     # ── resultados ──
     def _busca(self, busca_id=None):
@@ -644,6 +679,10 @@ FERRAMENTAS = [
      "parametros": {"busca_id": {"type": "integer"}, "quantidade": {"type": "integer", "description": "1 a 25"},
                     "chaves": {"type": "array", "items": _TXT}, "prioridade": _TXT}},
     {"nome": "resumo_funil", "metodo": "resumo_funil", "descricao": "Contagem por status e prospects em andamento.",
+     "parametros": {}},
+    {"nome": "abrir_painel", "metodo": "abrir_painel",
+     "descricao": ("Abre o painel do Prospecta no navegador do usuário: mapa, lista com botões de WhatsApp e rota, "
+                   "status dos contatos e planilhas. Use quando ele quiser ver ou mexer nos resultados visualmente."),
      "parametros": {}},
     {"nome": "exportar", "metodo": "exportar",
      "descricao": "Gera relatório HTML, planilha Excel, mapa KML e resumo de uma busca; devolve os caminhos.",
