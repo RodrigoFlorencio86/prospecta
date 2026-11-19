@@ -1,13 +1,14 @@
-# Publica uma Release no GitHub quando uma etiqueta de versão (v1.2.3) é enviada:
-# roda os testes, gera a extensão do Claude Desktop (.mcpb) e anexa o arquivo à Release.
+# Publica uma Release no GitHub: roda os testes, gera a extensão do Claude Desktop (.mcpb), cria a
+# etiqueta v<versão> e a Release com o arquivo anexado. A versão vem de prospecta/__init__.py.
 #
-#   git tag v0.2.0 && git push origin v0.2.0
-#
-# A etiqueta precisa bater com __version__ em prospecta/__init__.py.
+# Dois jeitos de disparar:
+#   - no site: Actions → release → Run workflow (no branch main);
+#   - enviando a etiqueta: git tag v0.2.0 && git push origin v0.2.0
 name: release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 permissions:
   contents: write   # necessário para criar a Release e anexar o arquivo
 jobs:
@@ -19,10 +20,16 @@ jobs:
         with:
           python-version: "3.13"
       - name: Conferir a versão
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSAO=$(python -c "import prospecta; print(prospecta.__version__)")
-          if [ "v$VERSAO" != "$GITHUB_REF_NAME" ]; then
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "v$VERSAO" != "$GITHUB_REF_NAME" ]; then
             echo "::error::A etiqueta $GITHUB_REF_NAME não bate com a versão do código ($VERSAO)."
+            exit 1
+          fi
+          if gh release view "v$VERSAO" >/dev/null 2>&1; then
+            echo "::error::A Release v$VERSAO já existe. Aumente __version__ em prospecta/__init__.py."
             exit 1
           fi
           echo "VERSAO=$VERSAO" >> "$GITHUB_ENV"
@@ -34,5 +41,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           sed "s/{{VERSAO}}/$VERSAO/g" .github/notas-da-versao.md > notas.md
-          gh release create "$GITHUB_REF_NAME" "dist/prospecta-$VERSAO.mcpb" \
-            --title "Prospecta $VERSAO" --notes-file notas.md --verify-tag
+          # disparada pelo botão, a própria Release cria a etiqueta no commit testado
+          gh release create "v$VERSAO" "dist/prospecta-$VERSAO.mcpb" --target "$GITHUB_SHA" \
+            --title "Prospecta $VERSAO" --notes-file notas.md
