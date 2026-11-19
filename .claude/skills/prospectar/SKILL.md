@@ -5,13 +5,14 @@ description: Encontra empresas (prospects B2B) perto de um endereço para um pre
 
 # Prospectar
 
-Siga o passo a passo de [AGENTS.md](../../../AGENTS.md):
+Se as ferramentas MCP `prospecta` estiverem disponíveis (iniciar_busca, estado_busca,
+consultar_prospects…), use-as. Senão, siga o passo a passo de [AGENTS.md](../../../AGENTS.md):
 
 1. Instale uma vez: `python3 -m prospecta instalar`.
 2. Entenda o serviço, o endereço, o raio e a assinatura da mensagem.
 3. Escolha um perfil (`python3 -m prospecta perfis --json`) ou monte `--alvos`, `--sinais` e
    `--mensagem` sob medida.
 4. Rode `python3 -m prospecta buscar …`, uma busca por vez.
-5. Mostre o `resumo.md` e ofereça abrir o `relatorio.html`.
+5. Mostre o `resumo.md` e ofereça abrir o `relatorio.html`, ou o painel (`python3 -m prospecta painel`).
 
 Nunca envie mensagens pelo usuário nem automatize disparos. Os dados ficam no computador dele.

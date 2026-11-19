@@ -39,7 +39,22 @@ CREATE TABLE IF NOT EXISTS prospects (
     PRIMARY KEY (chat_id, chave)
 );
 CREATE INDEX IF NOT EXISTS buscas_chat ON buscas(chat_id, criada);
+CREATE TABLE IF NOT EXISTS tarefas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER NOT NULL,
+    criada REAL NOT NULL,
+    atualizada REAL NOT NULL,
+    estado TEXT NOT NULL,          -- fila, rodando, ok, erro, cancelar, cancelada
+    parametros TEXT NOT NULL,
+    descricao TEXT DEFAULT '',
+    progresso REAL DEFAULT 0,
+    lugares INTEGER DEFAULT 0,
+    mensagem TEXT DEFAULT '',
+    busca_id INTEGER,
+    dono TEXT DEFAULT ''
+);
 """
+FINAIS = ("ok", "erro", "cancelada")
 
 STATUS = {"interessado": "⭐ Interessado", "contatado": "📨 Contatado", "visitar": "📍 Visitar",
           "cliente": "🤝 Cliente", "sem_interesse": "🚫 Sem interesse"}
@@ -50,8 +65,12 @@ PADROES = {"perfil": "refrigeracao", "alvos": "", "raio_km": 3.0, "modo": "rapid
 class Banco:
     def __init__(self, caminho):
         Path(caminho).parent.mkdir(parents=True, exist_ok=True)
-        self.con = sqlite3.connect(str(caminho), check_same_thread=False)
+        self.con = sqlite3.connect(str(caminho), check_same_thread=False, timeout=15)
         self.con.row_factory = sqlite3.Row
+        try:  # painel, MCP e linha de comando podem abrir o mesmo arquivo ao mesmo tempo
+            self.con.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.DatabaseError:
+            pass
         self.trava = threading.Lock()
         with self.trava, self.con:
             self.con.executescript(ESQUEMA)
@@ -163,3 +182,84 @@ class Banco:
                                       "('interessado','visitar','contatado') ORDER BY atualizado DESC LIMIT 30",
                                       (chat_id,)).fetchall()
         return contagem, [dict(r) for r in ativos]
+
+    # ── tarefas (buscas em segundo plano, visíveis para painel, chat e MCP) ──
+    def criar_tarefa(self, chat_id, parametros, descricao, dono):
+        agora = time.time()
+        with self.trava, self.con:
+            return self.con.execute(
+                "INSERT INTO tarefas (chat_id, criada, atualizada, estado, parametros, descricao, dono) "
+                "VALUES (?,?,?,?,?,?,?)", (chat_id, agora, agora, "fila", json.dumps(parametros, ensure_ascii=False),
+                                         descricao, dono)).lastrowid
+
+    def tarefa(self, tarefa_id):
+        with self.trava:
+            r = self.con.execute("SELECT * FROM tarefas WHERE id=?", (tarefa_id,)).fetchone()
+        if not r:
+            return None
+        d = dict(r)
+        d["parametros"] = json.loads(d["parametros"])
+        return d
+
+    def tarefas(self, chat_id, limite=20):
+        with self.trava:
+            rs = self.con.execute("SELECT * FROM tarefas WHERE chat_id=? ORDER BY id DESC LIMIT ?",
+                                  (chat_id, limite)).fetchall()
+        saida = []
+        for r in rs:
+            d = dict(r)
+            d["parametros"] = json.loads(d["parametros"])
+            saida.append(d)
+        return saida
+
+    def atualizar_tarefa(self, tarefa_id, **campos):
+        campos["atualizada"] = time.time()
+        sets = ", ".join(f"{k}=?" for k in campos)
+        with self.trava, self.con:
+            self.con.execute(f"UPDATE tarefas SET {sets} WHERE id=?", (*campos.values(), tarefa_id))
+
+    def pedir_cancelamento(self, tarefa_id):
+        with self.trava, self.con:
+            n = self.con.execute("UPDATE tarefas SET estado = CASE estado WHEN 'fila' THEN 'cancelada' ELSE 'cancelar' "
+                                 "END, atualizada=? WHERE id=? AND estado IN ('fila','rodando')",
+                                 (time.time(), tarefa_id)).rowcount
+        return n > 0
+
+    def outra_rodando(self, tarefa_id, validade=90):
+        """Há outra busca rodando (com sinal de vida recente), em qualquer processo?"""
+        with self.trava:
+            return self.con.execute("SELECT COUNT(*) FROM tarefas WHERE id!=? AND estado IN ('rodando','cancelar') "
+                                    "AND atualizada>?", (tarefa_id, time.time() - validade)).fetchone()[0] > 0
+
+    def encerrar_orfas(self, validade=120):
+        """Buscas que pararam de dar sinal de vida (o processo que as rodava foi fechado)."""
+        with self.trava, self.con:
+            self.con.execute("UPDATE tarefas SET estado='erro', mensagem='interrompida: o programa que fazia a busca "
+                             "foi fechado' WHERE estado IN ('rodando','cancelar') AND atualizada<?",
+                             (time.time() - validade,))
+
+    def tem_fila(self, chat_id):
+        with self.trava:
+            return self.con.execute("SELECT COUNT(*) FROM tarefas WHERE chat_id=? AND estado='fila'",
+                                    (chat_id,)).fetchone()[0] > 0
+
+    def pegar_proxima(self, chat_id):
+        """Reserva a busca mais antiga da fila (de forma atômica entre processos) -> id ou None."""
+        with self.trava, self.con:
+            for (tid,) in self.con.execute("SELECT id FROM tarefas WHERE chat_id=? AND estado='fila' ORDER BY id LIMIT 5",
+                                           (chat_id,)).fetchall():
+                if self.con.execute("UPDATE tarefas SET estado='rodando', atualizada=? WHERE id=? AND estado='fila'",
+                                    (time.time(), tid)).rowcount:
+                    return tid
+        return None
+
+    def sinal_de_vida(self, dono):
+        """Mantém vivas as buscas na fila deste processo (as que rodam já se atualizam sozinhas)."""
+        with self.trava, self.con:
+            self.con.execute("UPDATE tarefas SET atualizada=? WHERE dono=? AND estado='fila'", (time.time(), dono))
+
+    def proxima_tarefa(self, dono):
+        with self.trava:
+            r = self.con.execute("SELECT id FROM tarefas WHERE dono=? AND estado='fila' ORDER BY id LIMIT 1",
+                                 (dono,)).fetchone()
+        return r[0] if r else None

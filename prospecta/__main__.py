@@ -1,9 +1,13 @@
 """Linha de comando (é o que o seu agente de IA roda por você).
 
-    python -m prospecta instalar                     # baixa o motor de busca e testa tudo
-    python -m prospecta perfis                       # serviços prontos (--json para agentes)
+    python -m prospecta instalar                     # baixa o motor de busca, confere e abre o painel
+    python -m prospecta painel                       # painel no navegador (busca, mapa, contatos, chat)
     python -m prospecta buscar "Rua X, 100, Campinas" --raio 3 --perfil climatizacao
     python -m prospecta buscar "13010-001" --alvos "padaria, hotel" --empresa "Ana | Frio Total"
+    python -m prospecta perfis [--json]              # serviços prontos
+    python -m prospecta conectar claude|codex        # liga o Prospecta ao Claude Code ou ao Codex (MCP)
+    python -m prospecta mcp                          # servidor MCP (quem roda é o Claude Code / Codex)
+    python -m prospecta chatgpt status|sair          # conta do ChatGPT usada no chat do painel
     python -m prospecta motor ligar|desligar|status
     python -m prospecta verificar                    # testa motor, mapas e Telegram
     python -m prospecta bot                          # opcional: bot do Telegram
@@ -11,14 +15,13 @@
 import argparse
 import json
 import logging
-import re
+import shutil
+import subprocess
 import sys
 import threading
-import time
-import unicodedata
 from pathlib import Path
 
-from . import busca, exporta, geo, kit, perfis as perfis_mod, relatorio, rotas
+from . import busca, geo, kit, perfis as perfis_mod
 from .config import RAIZ, Config
 from .motor import ErroMotor, Motor
 from .rede import ErroRede
@@ -38,9 +41,9 @@ def _motor(cfg):
     return Motor(cfg.motor_url, cfg.motor_chave)
 
 
-def _slug(texto, n=40):
-    t = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", "-", t).strip("-")[:n] or "busca"
+def _app(cfg, **k):
+    from .ferramentas import Prospecta
+    return Prospecta(cfg, **k)
 
 
 # ── comandos ──
@@ -63,8 +66,14 @@ def cmd_instalar(cfg, a):
     env = RAIZ / ".env"
     if not env.exists():
         env.write_text((RAIZ / ".env.example").read_text(encoding="utf-8"), encoding="utf-8")
-        print(f"✓ criei {env} (edite CONTATO_GEOCODER com seu e-mail; o Telegram é opcional)")
-    print("\nPronto. Exemplo:\n  python -m prospecta buscar \"Rua X, 100, Sua Cidade\" --raio 3 --perfil limpeza")
+        print(f"✓ criei {env} (coloque seu e-mail em CONTATO_GEOCODER)")
+    print("\nPronto. Para usar:\n"
+          "  • painel no navegador:  python -m prospecta painel\n"
+          "  • no Claude Code:       python -m prospecta conectar claude\n"
+          "  • pela linha de comando: python -m prospecta buscar \"Rua X, 100, Sua Cidade\" --raio 3 --perfil limpeza")
+    if not a.sem_painel:
+        print()
+        return cmd_painel(cfg, argparse.Namespace(porta=None, nao_abrir=False))
     return 0
 
 
@@ -100,6 +109,9 @@ def cmd_verificar(cfg, _a):
     except ErroRede as ex:
         ok = False
         print("geocodificação: FALHOU —", ex)
+    from . import chatgpt
+    conta = chatgpt.Contas().ativa()
+    print("ChatGPT:", f"conectado ({conta.get('email')})" if conta and conta.get("access_token") else "não conectado (opcional)")
     if cfg.telegram_token:
         from .telegram import ErroTelegram, Telegram
         try:
@@ -113,138 +125,106 @@ def cmd_verificar(cfg, _a):
     return 0 if ok else 1
 
 
-def _perfil_da_linha(a):
-    todos = perfis_mod.carregar()
-    base = todos.get(a.perfil)
-    if a.perfil and not base and not a.alvos:
-        sys.exit(f"✗ perfil desconhecido: {a.perfil}. Veja: python -m prospecta perfis")
-    if a.alvos:
-        perfil = perfis_mod.personalizado(perfis_mod.separar_alvos(a.alvos), base.mensagem if base else None)
-        perfil.sinais = list(base.sinais) if base else []
-        if a.servico:
-            perfil.nome = a.servico
-    elif base:
-        perfil = base
-    else:
-        sys.exit("✗ informe --perfil (veja: python -m prospecta perfis) ou --alvos \"tipo 1, tipo 2\"")
-    if a.sinais:
-        perfil.sinais = [s.lower() for s in perfis_mod.separar_alvos(a.sinais)]
-    if a.mensagem:
-        perfil.mensagem = a.mensagem
-    if not perfil.alvos:
-        sys.exit("✗ informe --perfil ou --alvos")
-    return perfil
-
-
 def cmd_buscar(cfg, a):
-    perfil = _perfil_da_linha(a)
-    if not 0.3 <= a.raio <= cfg.raio_maximo_km:
-        sys.exit(f"✗ o raio vai de 0,3 a {cfg.raio_maximo_km:g} km (RAIO_MAXIMO_KM no .env)")
-    motor = _motor(cfg)
+    from .ferramentas import ErroFerramenta
+    app = _app(cfg, log=print)
+    try:
+        if a.empresa:
+            nome, _, empresa = a.empresa.partition("|")
+            app.configurar(meu_nome=nome, minha_empresa=empresa)
+        if a.base:
+            app.configurar(base_endereco=a.base)
+        opcoes = dict(raio_km=a.raio, perfil=a.perfil or None, alvos=a.alvos, servico=a.servico, sinais=a.sinais,
+                      mensagem=a.mensagem, modo=a.modo, so_novos=a.so_novos)
+        if not a.perfil and not a.alvos:
+            sys.exit("✗ informe --perfil (veja: python -m prospecta perfis) ou --alvos \"tipo 1, tipo 2\"")
+        p = app.preparar_busca(a.endereco, **opcoes)
+    except ErroFerramenta as ex:
+        sys.exit(f"✗ {ex}")
+    print(f"📍 {p['local']['descricao']}\n🔎 {p['perfil']['nome']}: {', '.join(p['perfil']['alvos'])}\n"
+          f"   raio {p['raio_km']:g} km · modo {busca.MODOS[p['modo']]['nome']} · {p['areas']} área(s) · "
+          f"~{p['estimativa_min']} min (estimativa)")
     if not a.nao_ligar:
         try:
-            kit.garantir(motor, cfg.motor_url)
+            kit.garantir(app.motor, cfg.motor_url)
         except kit.ErroKit as ex:
             sys.exit(f"✗ {ex}")
-    try:
-        local = _geocoder(cfg).buscar(a.endereco)
-    except ErroRede as ex:
-        sys.exit(f"✗ o serviço de mapas não respondeu ({ex}). Tente de novo, ou passe as coordenadas: \"-22.90, -47.06\"")
-    if not local:
-        sys.exit("✗ endereço não encontrado. Tente com rua, número e cidade, um CEP, ou \"latitude, longitude\".")
-    base = local
-    if a.base:
-        base = _geocoder(cfg).buscar(a.base) or local
-    minutos, areas = busca.estimar_minutos(a.raio * 1000, a.modo, len(perfil.alvos))
-    print(f"📍 {local.descricao}\n🔎 {perfil.nome}: {', '.join(perfil.alvos)}\n"
-          f"   raio {a.raio:g} km · modo {busca.MODOS[a.modo]['nome']} · {areas} área(s) · ~{minutos} min (estimativa)")
 
     def progresso(feitos, total, lugares):
         print(f"\r   {int(100 * feitos / max(total, 1)):3d}% · área {min(int(feitos) + 1, total)}/{total} · "
               f"{lugares} lugares lidos", end="", flush=True)
 
     try:
-        res = busca.prospectar(motor, local, a.raio * 1000, perfil, a.modo, progresso, threading.Event(),
-                               ler_sites=not a.sem_sites)
-    except ErroMotor as ex:
+        busca_id, info = app.rodar(p, progresso=progresso, cancelar=threading.Event())
+    except (ErroMotor, ErroFerramenta) as ex:
         sys.exit(f"\n✗ {ex}")
-    print()
-    prospects, ocultos = res.prospects, 0
-    from .banco import Banco
-    hist = Banco(Path(cfg.pasta_dados) / "historico.db")
-    if a.so_novos:
-        vistos = hist.ja_vistos(0, [p.chave for p in prospects])
-        ocultos = sum(p.chave in vistos for p in prospects)
-        prospects = [p for p in prospects if p.chave not in vistos]
-    hist.salvar_busca(0, {"lat": local.lat, "lon": local.lon, "descricao": local.descricao}, a.raio, perfil.nome,
-                      prospects, res.avisos)
-    hist.fechar()
-
-    pasta = Path(a.saida) / f"{time.strftime('%Y-%m-%d_%H%M')}_{_slug(perfil.nome, 25)}_{_slug(local.descricao, 30)}"
-    pasta.mkdir(parents=True, exist_ok=True)
-    meu_nome, _, empresa = (a.empresa or "").partition("|")
-    meu_nome, empresa = meu_nome.strip(), empresa.strip()
-    rota = rotas.planejar(base, prospects[:a.rota], osrm_url=cfg.osrm_url) if prospects and a.rota else None
-    dados = exporta.linhas(prospects, base, perfil, meu_nome, empresa)
-    resumo = {"Endereço": local.descricao, "Raio (km)": a.raio, "Serviço": perfil.nome,
-              "Procurado": ", ".join(perfil.alvos), "Data": time.strftime("%d/%m/%Y %H:%M"),
-              "Base das rotas": base.descricao, "Origem dos dados": "Google Maps (dados públicos) e sites das empresas",
-              "LGPD": "Use só para contato comercial B2B, identifique-se e atenda pedidos de exclusão."}
-    arquivos = {
-        "relatorio": relatorio.gerar(pasta / "relatorio.html", prospects, base, perfil, a.raio * 1000, meu_nome,
-                                     empresa, rota, f"{perfil.nome} — {local.bairro or local.cidade or 'busca'}"),
-        "planilha": exporta.salvar_xlsx(pasta / "prospects.xlsx", dados, resumo, rota),
-        "mapa": exporta.salvar_kml(pasta / "prospects.kml", prospects, base, f"Prospects {perfil.nome}"),
-    }
-    (pasta / "prospects.json").write_text(json.dumps([p.como_dict() for p in prospects], ensure_ascii=False, indent=1),
-                                          encoding="utf-8")
-    arquivos["resumo"] = _resumo_md(pasta / "resumo.md", local, base, perfil, a, res, prospects, ocultos, rota, dados)
-
-    print(f"\n✅ {len(prospects)} prospects ({res.brutos} resultados lidos em {res.pontos_feitos}/{res.pontos_total} "
-          f"áreas, {max(1, round(res.segundos / 60))} min)")
-    if ocultos:
-        print(f"   {ocultos} já recebidos em buscas anteriores foram ocultados (--so-novos)")
-    for aviso in res.avisos:
-        print("⚠️ ", aviso)
-    print(f"\n📂 {pasta.resolve()}")
-    for nome, caminho in arquivos.items():
+    print(f"\n\n✅ {info}")
+    exp = app.exportar(busca_id, top=a.top)
+    print(f"\n📂 {exp['pasta']}")
+    for nome, caminho in exp["arquivos"].items():
         print(f"   {nome:10} {Path(caminho).name}")
-    print(f"\nAbra o relatório no navegador: {Path(arquivos['relatorio']).resolve().as_uri()}")
+    print(f"\nAbra o relatório no navegador: {Path(exp['arquivos']['relatorio']).as_uri()}")
+    print("Ou veja tudo no painel: python -m prospecta painel")
     return 0
 
 
-def _resumo_md(caminho, local, base, perfil, a, res, prospects, ocultos, rota, dados):
-    """Resumo curto em Markdown, feito para o agente mostrar ao usuário."""
-    cont = {k: sum(p.prioridade == k for p in prospects) for k in "ABC"}
-    ls = [f"# Prospects: {perfil.nome}", "",
-          f"- **Local:** {local.descricao}", f"- **Raio:** {a.raio:g} km · modo {busca.MODOS[a.modo]['nome']}",
-          f"- **Procurado:** {', '.join(perfil.alvos)}",
-          f"- **Encontrados:** {len(prospects)} (A: {cont['A']}, B: {cont['B']}, C: {cont['C']})"
-          + (f", {ocultos} já recebidos antes ocultados" if ocultos else ""),
-          f"- **Com WhatsApp:** {sum(bool(p.whatsapp) for p in prospects)} · **com e-mail:** "
-          f"{sum(bool(p.emails) for p in prospects)} · **sem site próprio:** {sum(not p.site_proprio for p in prospects)}"]
-    for av in res.avisos:
-        ls.append(f"- ⚠️ {av}")
-    ls += ["", f"## Top {min(a.top, len(prospects))}", "",
-           "| # | Prior. | Nota | Nome | Categoria | Dist. | Bairro | Telefone | WhatsApp |",
-           "|---|---|---|---|---|---|---|---|---|"]
-    lim = lambda s: str(s).replace("|", "/").replace("\n", " ")  # noqa: E731
-    for i, (p, d) in enumerate(zip(prospects[:a.top], dados[:a.top]), 1):
-        wa = f"[abrir]({d['Abrir WhatsApp com mensagem']})" if d["Abrir WhatsApp com mensagem"] else "—"
-        ls.append(f"| {i} | {p.prioridade} | {p.nota} | {lim(p.nome)} | {lim(p.categoria)} | {p.distancia_km:.1f} km "
-                  f"| {lim(p.bairro)} | {lim(p.telefone) or '—'} | {wa} |")
-    if rota:
-        ls += ["", f"## Rota sugerida ({len(rota['ordem'])} paradas, saindo de {base.descricao})", "",
-               " → ".join(p.nome for p in rota["ordem"]), "",
-               f"{rota['km']:.1f} km, ~{rota['minutos_carro']} min dirigindo (estimado), ~{rota['minutos']} min com visitas."]
-        ls += [f"- [Abrir trecho {i} no Google Maps]({l})" for i, l in enumerate(rota["links"], 1)]
-    ls += ["", "## Arquivos", "", "- `relatorio.html`: abra no navegador (botões de WhatsApp, rota, mapa, status)",
-           "- `prospects.xlsx`: planilha completa com colunas para acompanhar os contatos",
-           "- `prospects.kml`: importe em mymaps.google.com para ver no mapa",
-           "- `prospects.json`: os mesmos dados para outros programas"]
-    caminho = Path(caminho)
-    caminho.write_text("\n".join(ls) + "\n", encoding="utf-8")
-    return caminho
+def cmd_painel(cfg, a):
+    from .painel import servir
+    return servir(cfg, porta=a.porta, abrir=not a.nao_abrir)
+
+
+def cmd_trabalhar(cfg, _a):
+    """Processo em segundo plano que executa as buscas da fila (disparado pelo painel, chat e MCP)."""
+    _app(cfg, log=lambda *x: print(*x, file=sys.stderr)).trabalhar_fila()
+    return 0
+
+
+def cmd_mcp(cfg, _a):
+    from .mcp_servidor import servir
+    return servir(cfg)
+
+
+def cmd_conectar(cfg, a):
+    """Registra o servidor MCP no Claude Code ou no Codex, com caminhos absolutos."""
+    lancador = str((RAIZ / "mcp.py").resolve())
+    if a.cliente == "claude":
+        cmd = ["claude", "mcp", "add", "--scope", "user", "prospecta", "--", sys.executable, lancador]
+    else:
+        cmd = ["codex", "mcp", "add", "prospecta", "--", sys.executable, lancador]
+    if not shutil.which(cmd[0]):
+        print(f"Não achei o comando '{cmd[0]}'. Instale o {'Claude Code' if a.cliente == 'claude' else 'Codex'} "
+              f"e rode de novo, ou registre manualmente:\n  {' '.join(_q(c) for c in cmd)}")
+        return 1
+    print("▶", " ".join(_q(c) for c in cmd))
+    r = subprocess.run(cmd)
+    if r.returncode == 0:
+        print(f"✓ pronto: abra o {'Claude Code' if a.cliente == 'claude' else 'Codex'} e peça, por exemplo, "
+              "\"procure padarias num raio de 2 km da Rua X, 100, Campinas\".")
+    return r.returncode
+
+
+def _q(s):
+    return f'"{s}"' if " " in s else s
+
+
+def cmd_chatgpt(cfg, a):
+    from . import chatgpt
+    contas = chatgpt.Contas()
+    conta = contas.ativa()
+    if a.acao == "status":
+        if not conta:
+            print("Nenhuma conta do ChatGPT conectada. Conecte pelo painel: python -m prospecta painel")
+        else:
+            uso = "liberado" if chatgpt.ESCOPO_PLANO in (conta.get("scopes") or []) else "NÃO autorizado"
+            print(f"Conta: {conta.get('email')} · uso do plano: {uso} · sessão: "
+                  f"{'ativa' if conta.get('refresh_token') else 'encerrada'}")
+        return 0
+    if not conta:
+        print("Nenhuma conta conectada.")
+        return 0
+    aviso = chatgpt.Autenticador(contas).sair()
+    print("✓ desconectado." + (f" {aviso}" if aviso else ""))
+    return 0
 
 
 def cmd_bot(cfg, _a):
@@ -264,10 +244,20 @@ def cmd_bot(cfg, _a):
 
 
 def main(argv=None):
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", stream=sys.stderr)
     ap = argparse.ArgumentParser(prog="prospecta", description="Prospecção B2B por raio a partir do Google Maps")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("instalar", help="baixa o motor de busca, liga e confere tudo")
+    i = sub.add_parser("instalar", help="baixa o motor de busca, liga, confere e abre o painel")
+    i.add_argument("--sem-painel", action="store_true", help="não abrir o painel no final")
+    pn = sub.add_parser("painel", help="painel no navegador")
+    pn.add_argument("--porta", type=int, help="porta local (padrão 8765)")
+    pn.add_argument("--nao-abrir", action="store_true", help="não abrir o navegador")
+    sub.add_parser("mcp", help="servidor MCP (stdio) para Claude Code / Codex")
+    sub.add_parser("trabalhar", help=argparse.SUPPRESS)
+    c = sub.add_parser("conectar", help="registra o Prospecta no Claude Code ou no Codex")
+    c.add_argument("cliente", choices=["claude", "codex"])
+    g = sub.add_parser("chatgpt", help="conta do ChatGPT do chat do painel")
+    g.add_argument("acao", choices=["status", "sair"])
     m = sub.add_parser("motor", help="liga, desliga ou mostra o motor de busca")
     m.add_argument("acao", choices=["ligar", "desligar", "status", "reiniciar"])
     p = sub.add_parser("perfis", help="lista os serviços prontos")
@@ -282,19 +272,21 @@ def main(argv=None):
     b.add_argument("--servico", help='nome do seu serviço quando usar --alvos, ex.: "Manutenção de fornos"')
     b.add_argument("--sinais", help='palavras nas avaliações que indicam necessidade, ex.: "forno, queimado"')
     b.add_argument("--mensagem", help="modelo da mensagem de WhatsApp com {prospect} {bairro} {meu_nome} {minha_empresa}")
-    b.add_argument("--empresa", help='"Seu Nome | Sua Empresa" para assinar a mensagem')
-    b.add_argument("--base", help="endereço da sua empresa, ponto de partida das rotas (padrão: o da busca)")
+    b.add_argument("--empresa", help='"Seu Nome | Sua Empresa" para assinar a mensagem (fica salvo)')
+    b.add_argument("--base", help="endereço da sua empresa, ponto de partida das rotas (fica salvo)")
     b.add_argument("--modo", choices=sorted(busca.MODOS), default="rapido")
     b.add_argument("--so-novos", action="store_true", help="esconde prospects já entregues em buscas anteriores")
-    b.add_argument("--rota", type=int, default=10, help="quantos dos melhores entram na rota (0 = sem rota)")
     b.add_argument("--top", type=int, default=15, help="quantos aparecem no resumo.md")
-    b.add_argument("--saida", default=str(RAIZ / "resultados"))
-    b.add_argument("--sem-sites", action="store_true", help="não abrir os sites para procurar WhatsApp")
+    b.add_argument("--saida", help="pasta dos resultados (padrão: resultados/)")
+    b.add_argument("--sem-sites", action="store_true", help=argparse.SUPPRESS)
     b.add_argument("--nao-ligar", action="store_true", help="não ligar o motor automaticamente")
     a = ap.parse_args(argv)
     cfg = Config.do_ambiente()
-    cmds = {"instalar": cmd_instalar, "motor": cmd_motor, "perfis": cmd_perfis, "verificar": cmd_verificar,
-            "buscar": cmd_buscar, "bot": cmd_bot}
+    if getattr(a, "saida", None):
+        cfg.pasta_resultados = Path(a.saida)
+    cmds = {"instalar": cmd_instalar, "painel": cmd_painel, "mcp": cmd_mcp, "conectar": cmd_conectar,
+            "chatgpt": cmd_chatgpt, "motor": cmd_motor, "perfis": cmd_perfis, "verificar": cmd_verificar,
+            "buscar": cmd_buscar, "bot": cmd_bot, "trabalhar": cmd_trabalhar}
     return cmds[a.cmd](cfg, a) or 0
 
 

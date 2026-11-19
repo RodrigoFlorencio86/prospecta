@@ -19,6 +19,7 @@ from .config import RAIZ
 REPO = "https://github.com/mahanaicoach/google-maps-scraper-kit"
 VERSAO = "446f231e66ba787465bb70dad2a416feec18dad3"  # commit testado; troque com cuidado
 PASTA = RAIZ / "motor" / "google-maps-scraper-kit"
+SAIDA_ERRO = "stderr"  # manda a saída do motor para o stderr (o stdout do servidor MCP é só do protocolo)
 
 
 class ErroKit(RuntimeError):
@@ -89,15 +90,21 @@ def local(motor_url):
     return (urllib.parse.urlsplit(motor_url).hostname or "") in ("localhost", "127.0.0.1", "::1")
 
 
-def comando(acao, motor_url="http://localhost:8080", pasta=PASTA):
+def comando(acao, motor_url="http://localhost:8080", pasta=PASTA, saida=None):
     """Roda `engine.py <acao>` do kit (start, stop, status, restart) -> código de saída."""
     if not instalado(pasta):
         raise ErroKit("o motor não está instalado. Rode: python -m prospecta instalar")
     env = dict(os.environ, SCRAPER_PORT=str(_porta(motor_url)), SCRAPER_NO_UPDATE_CHECK="1")
-    return subprocess.run([sys.executable, str(Path(pasta) / "scripts" / "engine.py"), acao], env=env).returncode
+    if saida == SAIDA_ERRO:
+        try:
+            saida = sys.stderr.fileno()
+        except (AttributeError, OSError, ValueError):
+            saida = subprocess.DEVNULL
+    return subprocess.run([sys.executable, str(Path(pasta) / "scripts" / "engine.py"), acao], env=env,
+                          stdout=saida, stdin=subprocess.DEVNULL).returncode
 
 
-def garantir(motor, motor_url, pasta=PASTA, log=print, espera=90):
+def garantir(motor, motor_url, pasta=PASTA, log=print, espera=90, saida=None):
     """Liga o motor local se ele não estiver respondendo. Lança ErroKit se não der."""
     from .motor import ErroMotor
     try:
@@ -110,7 +117,7 @@ def garantir(motor, motor_url, pasta=PASTA, log=print, espera=90):
     if not instalado(pasta):
         raise ErroKit("o motor não está instalado. Rode: python -m prospecta instalar")
     log("▶ ligando o motor de busca…")
-    if comando("start", motor_url, pasta) != 0:
+    if comando("start", motor_url, pasta, saida) != 0:
         raise ErroKit("o motor não ligou; veja a mensagem acima")
     fim = time.monotonic() + espera
     while time.monotonic() < fim:

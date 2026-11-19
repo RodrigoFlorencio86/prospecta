@@ -5,8 +5,9 @@ serviço**. Diga o que você faz e de onde quer partir, e ela procura no Google 
 alguns quilômetros, as empresas que podem contratar você: padarias para quem conserta freezer,
 clínicas para quem limpa ar-condicionado, restaurantes para quem faz dedetização, e assim por diante.
 
-Tudo roda **no seu computador**. Não precisa de conta, assinatura ou chave de API, e os dados não saem
-da sua máquina.
+Tudo roda **no seu computador**. Não precisa de conta, assinatura ou chave de API, e os dados ficam na
+sua máquina. Se quiser, conecte o seu ChatGPT (ou use o Claude Code) para conversar com um assistente
+que faz as buscas e organiza os contatos por você.
 
 ## O que você recebe
 
@@ -24,19 +25,64 @@ da sua máquina.
 - **Só os novos**: na busca do mês seguinte, `--so-novos` mostra só as empresas que você ainda não
   tinha.
 
-## Como usar: entregue o link ao seu agente de IA
+## Três jeitos de usar
 
-O jeito mais fácil é pedir a um **agente de IA que roda no seu computador** para fazer tudo por você.
-Ele instala, faz as perguntas certas, roda a busca e mostra o resultado. Funciona com:
+Instale uma vez (precisa de **Python 3.9+** — [download](https://www.python.org/downloads/); no
+Windows, marque "Add python.exe to PATH" e troque `python3` por `py` nos comandos):
 
-- **Claude Code**: no terminal ou na aba "Code" do app Claude para desktop
-- **Codex**, o agente do ChatGPT: no app do Codex, no terminal ou no VS Code
-- **Cursor**, **Gemini CLI** ou outro agente que execute comandos no seu computador
+```bash
+git clone https://github.com/RodrigoFlorencio86/AI-Stuff.git
+cd AI-Stuff/prospecta-bot
+python3 -m prospecta instalar          # baixa o motor de busca, confere tudo e abre o painel
+```
 
-> O ChatGPT e o Claude **comuns, no navegador**, não conseguem rodar programas no seu computador.
-> Use um dos agentes acima.
+### 1. Painel no navegador (com assistente do ChatGPT)
 
-Abra o agente numa pasta qualquer e cole a mensagem abaixo, trocando o que está entre colchetes:
+```bash
+python3 -m prospecta painel
+```
+
+Abre `http://127.0.0.1:8765` no seu navegador, servido pelo seu próprio computador:
+
+- **Nova busca**: endereço ou CEP, o seu serviço (ou os tipos de negócio que você digitar), raio e
+  modo. A busca roda em segundo plano, com barra de progresso, e continua mesmo se você fechar a
+  página.
+- **Resultados**:
+  - mapa, filtros e a lista com botões de WhatsApp, rota, Waze e Maps;
+  - status de cada contato e anotações;
+  - rota otimizada e exportação da planilha, do relatório e do mapa.
+- **Assistente**: clique em **Continuar com ChatGPT**, entre com a sua conta e converse em
+  português. Exemplos de pedidos:
+  - "procure academias e clínicas num raio de 2 km da minha empresa"
+  - "quais têm WhatsApp e mais de 100 avaliações?"
+  - "monte a rota de amanhã com os 8 melhores"
+  - "marque a Padaria X como interessada"
+
+  O assistente usa o **seu plano do ChatGPT** (Go, Plus, Pro ou Business), pelo recurso oficial
+  "Sign in with ChatGPT" da OpenAI para apps de código aberto. O Prospecta não cobra nada. Você
+  acompanha e limita o uso em [ChatGPT → Configurações → Uso](https://chatgpt.com/settings/usage).
+  Sem conta do ChatGPT, o painel funciona igual, só sem o assistente.
+
+### 2. Claude Code ou Codex (MCP)
+
+O Prospecta vira um conjunto de ferramentas dentro do seu agente:
+
+```bash
+python3 -m prospecta conectar claude   # ou: conectar codex
+```
+
+Depois é só conversar no Claude Code (ou no Codex), por exemplo: *"procure escritórios e clínicas
+num raio de 2 km da Rua X, 100, Campinas e me mostre os 10 melhores com WhatsApp"*. O agente usa as
+mesmas ferramentas do painel: buscar, acompanhar, filtrar, marcar status, montar rota e mensagem,
+exportar. As buscas feitas por ele aparecem também no painel.
+
+Abrindo o Claude Code dentro desta pasta, o arquivo `.mcp.json` já oferece o servidor `prospecta`
+(o Claude Code pede para você aprovar na primeira vez).
+
+### 3. Pedir a um agente que instale e use para você
+
+Não quer digitar comando nenhum? Abra o Claude Code, o Codex, o Cursor ou o Gemini CLI numa pasta
+qualquer e cole, trocando o que está entre colchetes:
 
 ```text
 Clone https://github.com/RodrigoFlorencio86/AI-Stuff e siga o arquivo prospecta-bot/AGENTS.md
@@ -45,33 +91,20 @@ ar-condicionado] e minha empresa fica em [endereço ou CEP]. Quero procurar num 
 Meu nome e empresa para as mensagens: [Seu Nome | Sua Empresa].
 ```
 
-O agente lê o [`AGENTS.md`](AGENTS.md), que tem o passo a passo e as regras: uma busca por vez,
-nada de envio automático de mensagens, dados só no seu computador. O Claude Code também carrega a
-skill `prospectar` desta pasta.
+> O ChatGPT e o Claude **comuns, no navegador**, não rodam programas no seu computador. Para isso
+> use um agente (os citados acima) ou o painel.
 
-## Como usar sem agente
-
-Precisa de **Python 3.9+** ([download](https://www.python.org/downloads/); no Windows, marque
-"Add python.exe to PATH") e, de preferência, do Google Chrome. No Windows, troque `python3` por `py`.
+### Pela linha de comando
 
 ```bash
-git clone https://github.com/RodrigoFlorencio86/AI-Stuff.git
-cd AI-Stuff/prospecta-bot
-python3 -m prospecta instalar          # baixa o motor de busca e confere tudo (uma vez)
 python3 -m prospecta perfis            # serviços prontos
-
 python3 -m prospecta buscar "Rua Exemplo, 100, Campinas SP" --raio 3 --perfil climatizacao \
     --empresa "Ana Souza | Clima Bom"
-```
-
-Serviço que não está na lista? Diga o que procurar:
-
-```bash
 python3 -m prospecta buscar "13010-001" --raio 2 --alvos "padaria, pizzaria, hotel" \
     --servico "Manutenção de fornos" --sinais "forno, queimado" --empresa "João | Forno Certo"
 ```
 
-O resultado fica em `resultados/<data>_<serviço>_<local>/`. Abra o `relatorio.html` no navegador.
+O resultado fica em `resultados/<data>_<serviço>_<local>_<n>/`. Abra o `relatorio.html` no navegador.
 
 ### Opções da busca
 
@@ -83,11 +116,11 @@ O resultado fica em `resultados/<data>_<serviço>_<local>/`. Abra o `relatorio.h
 | `--servico "..."` | Nome do seu serviço, quando usar `--alvos` |
 | `--sinais "a, b"` | Palavras nas avaliações que indicam necessidade (ex.: "calor", "barata") |
 | `--mensagem "..."` | Sua mensagem de WhatsApp, com `{prospect}`, `{bairro}`, `{meu_nome}` e `{minha_empresa}` |
-| `--empresa "Nome \| Empresa"` | Quem assina a mensagem |
-| `--base "endereço"` | Ponto de partida das rotas, se for diferente do centro da busca |
+| `--empresa "Nome \| Empresa"` | Quem assina a mensagem (fica salvo) |
+| `--base "endereço"` | Ponto de partida das rotas, se for diferente do centro da busca (fica salvo) |
 | `--modo completo` | Mais resultados e leitura das avaliações, mas várias vezes mais lento |
 | `--so-novos` | Esconde empresas que já apareceram em buscas anteriores |
-| `--rota 10` | Quantas das melhores entram na rota sugerida (0 para nenhuma) |
+| `--top 15` | Quantas empresas aparecem no `resumo.md` |
 
 ## Serviços prontos
 
@@ -130,6 +163,19 @@ os `alvos`, os `sinais` e a `mensagem`. Ou peça ao seu agente para fazer isso.
 
 Antes de começar, a busca mostra a estimativa de tempo. Em geral, leva de 5 a 30 minutos: menos
 tipos de negócio e raio menor deixam mais rápido.
+
+## Privacidade e segurança
+
+- **Dados:** as buscas, os resultados e os status ficam no seu computador (`dados/` e `resultados/`).
+- **Login do ChatGPT:**
+  - fica em `~/.config/prospecta/` (no Windows, `%APPDATA%\prospecta`), num arquivo que só o seu
+    usuário lê;
+  - o Prospecta nunca vê a sua senha e não tem acesso às suas conversas do ChatGPT;
+  - em "sair", a sessão é encerrada na OpenAI;
+  - para cortar o acesso de vez, desconecte o Prospecta nas configurações do ChatGPT.
+- **O que vai para a OpenAI:** só o que você conversa com o assistente e os dados que ele consulta
+  para responder (nomes, bairros e contatos públicos das empresas).
+- **O painel** só atende o próprio computador (127.0.0.1) e recusa pedidos de outros sites.
 
 ## Cuidados
 
@@ -175,7 +221,7 @@ Comandos do bot:
 ## Para desenvolvedores
 
 ```bash
-python3 -m unittest discover -s tests -t .    # testes sem internet (motor e Telegram simulados)
+python3 -m unittest discover -s tests -t .    # testes sem internet (motor, OpenAI e Telegram simulados)
 ```
 
 ```
@@ -192,6 +238,11 @@ prospecta/
   relatorio.py  relatório HTML
   exporta.py    planilha XLSX/CSV e mapa KML
   banco.py      histórico e status dos contatos (SQLite)
+  ferramentas.py  operações usadas pelo painel, chat e MCP; buscas em processo próprio
+  painel.py, painel.html  painel local no navegador
+  chatgpt.py    "Sign in with ChatGPT": OAuth PKCE, validação RS256, renovação e revogação
+  chat.py       assistente: API Responses (streaming) com as ferramentas do Prospecta
+  mcp_servidor.py  servidor MCP (stdio) para Claude Code e Codex
   bot.py, telegram.py   bot de Telegram opcional
   perfis.json   serviços prontos
 ```

@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prospecta</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+  --fundo:#f4f6f8; --cartao:#ffffff; --texto:#17202b; --suave:#5b6878; --linha:#e1e6eb; --campo:#ffffff;
+  --azul:#1f5fbf; --azul-claro:#e8f0fc; --a:#1e8e3e; --b:#d39200; --c:#98a3ae; --erro:#c62828; --ok:#1e8e3e;
+  --wa:#1fa855; --preto:#0d0d0d;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --fundo:#11151a; --cartao:#1a2028; --texto:#e7ecf1; --suave:#9aa6b3; --linha:#2a323c; --campo:#141a21;
+          --azul:#6ea2ff; --azul-claro:#1d2a3f; --preto:#f2f2f2; }
+}
+* { box-sizing:border-box; }
+html, body { margin:0; }
+body { font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--fundo); color:var(--texto); }
+a { color:var(--azul); }
+button, input, select, textarea { font:inherit; color:inherit; }
+input, select, textarea { width:100%; padding:8px 10px; border:1px solid var(--linha); border-radius:8px; background:var(--campo); }
+textarea { resize:vertical; }
+label { display:block; font-size:.85rem; color:var(--suave); margin:10px 0 4px; }
+button { cursor:pointer; border:1px solid var(--linha); background:var(--cartao); border-radius:8px; padding:8px 12px; }
+button.prim { background:var(--azul); border-color:var(--azul); color:#fff; font-weight:600; }
+button.peq { padding:4px 9px; font-size:.85rem; }
+button:disabled { opacity:.55; cursor:default; }
+header { display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--cartao); border-bottom:1px solid var(--linha); position:sticky; top:0; z-index:500; }
+header h1 { font-size:1.15rem; margin:0; }
+.pilula { font-size:.8rem; color:var(--suave); display:flex; align-items:center; gap:6px; }
+.ponto { width:8px; height:8px; border-radius:50%; background:var(--c); display:inline-block; }
+.ponto.ok { background:var(--ok); } .ponto.mal { background:var(--erro); }
+.espaco { flex:1; }
+main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; padding:14px 16px 30px; align-items:start; }
+.cartao { background:var(--cartao); border:1px solid var(--linha); border-radius:12px; padding:14px; }
+.cartao + .cartao { margin-top:14px; }
+.cartao h2 { font-size:1rem; margin:0 0 6px; }
+.dica { font-size:.82rem; color:var(--suave); }
+.linha2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.check { display:flex; gap:8px; align-items:center; margin-top:10px; font-size:.9rem; }
+.check input { width:auto; }
+.tarefa { border-top:1px solid var(--linha); padding:8px 0; font-size:.88rem; }
+.tarefa:first-of-type { border-top:none; }
+.barra { height:6px; background:var(--linha); border-radius:4px; overflow:hidden; margin:5px 0; }
+.barra > i { display:block; height:100%; background:var(--azul); transition:width .4s; }
+.hist { list-style:none; margin:0; padding:0; }
+.hist li { padding:8px 6px; border-radius:8px; cursor:pointer; font-size:.88rem; }
+.hist li:hover, .hist li.sel { background:var(--azul-claro); }
+.hist small { color:var(--suave); display:block; }
+#mapa { height:330px; border-radius:10px; border:1px solid var(--linha); margin:10px 0; }
+.kpis { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
+.kpi { border:1px solid var(--linha); border-radius:10px; padding:6px 10px; font-size:.85rem; }
+.kpi b { display:block; font-size:1.05rem; }
+.filtros { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:8px; margin:10px 0; }
+.acoes-busca { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.lista { display:grid; gap:10px; }
+.p { border:1px solid var(--linha); border-left:5px solid var(--c); border-radius:10px; padding:10px 12px; }
+.p.A { border-left-color:var(--a); } .p.B { border-left-color:var(--b); }
+.topo { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+.nome { font-weight:650; }
+.info { color:var(--suave); font-size:.88rem; overflow-wrap:anywhere; }
+.botoes { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; align-items:center; }
+.botoes a { text-decoration:none; padding:5px 9px; border-radius:8px; border:1px solid var(--linha); color:var(--texto); font-size:.85rem; }
+.botoes a.wa { background:var(--wa); border-color:var(--wa); color:#fff; }
+.botoes select { width:auto; padding:4px 8px; font-size:.85rem; }
+.vazio { color:var(--suave); padding:20px 4px; }
+.rota { background:var(--azul-claro); border-radius:10px; padding:10px 12px; margin-top:10px; font-size:.9rem; }
+/* chat */
+#chat { position:sticky; top:66px; display:flex; flex-direction:column; height:calc(100vh - 96px); min-height:420px; }
+#msgs { flex:1; overflow:auto; display:flex; flex-direction:column; gap:10px; padding:4px 2px 10px; }
+.msg { max-width:92%; padding:8px 11px; border-radius:12px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:.92rem; }
+.msg.eu { align-self:flex-end; background:var(--azul); color:#fff; border-bottom-right-radius:4px; }
+.msg.ia { align-self:flex-start; background:var(--fundo); border:1px solid var(--linha); border-bottom-left-radius:4px; }
+.msg.erro { align-self:stretch; background:transparent; border:1px solid var(--erro); color:var(--erro); }
+.acao { align-self:flex-start; font-size:.78rem; color:var(--suave); border:1px dashed var(--linha); border-radius:8px; padding:3px 8px; }
+#entrada { display:flex; gap:8px; margin-top:8px; }
+#entrada textarea { min-height:44px; max-height:140px; }
+.plano { display:flex; align-items:center; gap:8px; font-size:.8rem; color:var(--suave); margin:6px 0; }
+.btn-chatgpt { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; background:var(--preto); color:var(--cartao); border:none; border-radius:999px; padding:11px 16px; font-weight:600; }
+.limite { border:1px solid var(--linha); border-radius:10px; padding:10px; margin:6px 0; }
+.limite b { display:block; }
+.modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px; }
+.modal .cartao { max-width:420px; text-align:center; }
+.aviso { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:var(--texto); color:var(--fundo); padding:10px 16px; border-radius:10px; z-index:1100; max-width:90vw; box-shadow:0 4px 20px rgba(0,0,0,.25); }
+.oculto { display:none !important; }
+@media (max-width: 1200px) {
+  main { grid-template-columns:300px minmax(0,1fr); }
+  #col-chat { grid-column:1 / -1; }
+  #chat { position:static; height:520px; }
+}
+@media (max-width: 760px) {
+  main { grid-template-columns:1fr; padding:10px; }
+  .filtros { grid-template-columns:1fr 1fr; }
+  header { flex-wrap:wrap; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Prospecta</h1>
+  <span class="pilula"><span id="motor-ponto" class="ponto"></span><span id="motor-txt">verificando motor…</span></span>
+  <span class="espaco"></span>
+  <span class="pilula" id="conta-topo"></span>
+</header>
+
+<main>
+  <!-- coluna 1: nova busca, andamento, histórico -->
+  <section id="col-busca">
+    <div class="cartao">
+      <h2>Nova busca</h2>
+      <form id="f-busca" autocomplete="on">
+        <label for="b-end">Endereço, CEP ou "latitude, longitude"</label>
+        <input id="b-end" name="endereco" required placeholder="Ex.: Rua Barão de Jaguara, 1000, Campinas SP">
+        <label for="b-perfil">Seu serviço</label>
+        <select id="b-perfil"></select>
+        <div id="b-outro" class="oculto">
+          <label for="b-servico">Nome do serviço</label>
+          <input id="b-servico" placeholder="Ex.: Manutenção de fornos">
+          <label for="b-alvos">Tipos de negócio a procurar (separe por vírgula)</label>
+          <input id="b-alvos" placeholder="padaria, pizzaria, hotel, restaurante">
+          <label for="b-sinais">Palavras de necessidade nas avaliações (opcional)</label>
+          <input id="b-sinais" placeholder="forno, queimado, demora">
+        </div>
+        <div class="linha2">
+          <div><label for="b-raio">Raio: <b id="b-raio-txt">3 km</b></label>
+            <input id="b-raio" type="range" min="0.5" max="15" step="0.5" value="3"></div>
+          <div><label for="b-modo">Modo</label>
+            <select id="b-modo"><option value="rapido">Rápido</option><option value="completo">Completo (lento)</option></select></div>
+        </div>
+        <label class="check"><input type="checkbox" id="b-novos"> Só empresas que eu ainda não vi</label>
+        <p class="dica" id="b-estimativa">Dica: 1 a 5 km e poucos tipos de negócio deixam a busca rápida.</p>
+        <button class="prim" type="submit" id="b-ir" style="width:100%">Buscar empresas</button>
+      </form>
+    </div>
+
+    <div class="cartao" id="c-tarefas">
+      <h2>Andamento</h2>
+      <div id="tarefas"><p class="dica">Nenhuma busca recente.</p></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Buscas anteriores</h2>
+      <ul class="hist" id="hist"></ul>
+    </div>
+
+    <div class="cartao">
+      <details>
+        <summary><b>Seus dados</b> <span class="dica">(assinatura das mensagens e saída das rotas)</span></summary>
+        <form id="f-config">
+          <label for="c-nome">Seu nome</label><input id="c-nome" maxlength="60">
+          <label for="c-empresa">Sua empresa</label><input id="c-empresa" maxlength="80">
+          <label for="c-base">Endereço da sua empresa (saída das rotas)</label><input id="c-base" placeholder="Deixe vazio para sair do endereço da busca">
+          <p class="dica" id="c-base-atual"></p>
+          <button type="submit" style="margin-top:8px">Salvar</button>
+        </form>
+      </details>
+    </div>
+  </section>
+
+  <!-- coluna 2: resultados -->
+  <section id="col-res">
+    <div class="cartao" id="res">
+      <div id="res-vazio" class="vazio">Faça uma busca ou escolha uma anterior para ver as empresas aqui.</div>
+      <div id="res-cheio" class="oculto">
+        <h2 id="res-titulo"></h2>
+        <div class="dica" id="res-sub"></div>
+        <div class="kpis" id="res-kpis"></div>
+        <div class="acoes-busca">
+          <select id="rota-n" style="width:auto"><option value="5">Rota com 5</option><option value="8" selected>Rota com 8</option><option value="12">Rota com 12</option></select>
+          <button id="btn-rota">🗺️ Montar rota</button>
+          <button id="btn-exportar">📄 Planilha e relatório</button>
+          <span id="links-exp" class="dica"></span>
+        </div>
+        <div id="rota" class="rota oculto"></div>
+        <div id="mapa"></div>
+        <div class="filtros">
+          <input id="f-q" type="search" placeholder="Filtrar por nome, bairro, categoria">
+          <select id="f-p"><option value="">Prioridade</option><option>A</option><option>B</option><option>C</option></select>
+          <select id="f-w"><option value="">WhatsApp?</option><option value="1">Com WhatsApp</option></select>
+          <select id="f-s"><option value="*">Status</option><option value="">Sem status</option></select>
+        </div>
+        <div class="lista" id="lista"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- coluna 3: chat -->
+  <section id="col-chat">
+    <div class="cartao" id="chat">
+      <h2>Assistente</h2>
+      <div id="chat-fora">
+        <p class="dica">Converse sobre suas buscas, peça novas buscas, rotas e mensagens em português, usando o seu plano do ChatGPT.</p>
+        <div class="cartao" style="margin:10px 0">
+          <b>Use seu plano do ChatGPT</b>
+          <p class="dica">Os pedidos do assistente usam o seu plano do ChatGPT (Go, Plus, Pro ou Business). O Prospecta é gratuito e não cobra nada.</p>
+          <!-- Para publicar, use o logotipo oficial da OpenAI neste botão (veja developers.openai.com/siwc/website). -->
+          <button class="btn-chatgpt" id="btn-entrar" data-oai-siwc-button>Continuar com ChatGPT</button>
+        </div>
+        <p class="dica">Prefere o Claude Code ou o Codex? Rode <code>python -m prospecta conectar claude</code> (ou <code>codex</code>) e converse por lá: as buscas aparecem aqui também.</p>
+      </div>
+      <div id="chat-sem-plano" class="oculto">
+        <p>Sua conta está conectada, mas o uso do plano do ChatGPT não foi autorizado.</p>
+        <button class="btn-chatgpt" id="btn-consentir" data-oai-siwc-button>Continuar com ChatGPT</button>
+        <p><button class="peq" id="btn-sair2">Sair</button></p>
+      </div>
+      <div id="chat-dentro" class="oculto" style="display:flex; flex-direction:column; flex:1; min-height:0">
+        <div class="linha2">
+          <select id="modelo" title="Modelo"></select>
+          <button class="peq" id="btn-nova">Nova conversa</button>
+        </div>
+        <div class="plano">Usando seu plano do ChatGPT · <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener">Gerenciar uso</a></div>
+        <div id="msgs"></div>
+        <form id="entrada">
+          <textarea id="texto" rows="2" placeholder="Ex.: procure academias e clínicas num raio de 2 km da minha empresa"></textarea>
+          <button class="prim" id="btn-enviar">Enviar</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="modal" class="modal oculto"><div class="cartao" id="modal-corpo"></div></div>
+<div id="aviso" class="aviso oculto"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const STATUS = {"": "Status…", interessado: "⭐ Interessado", contatado: "📨 Contatado", visitar: "📍 Visitar",
+                cliente: "🤝 Cliente", sem_interesse: "🚫 Sem interesse"};
+const COR = {A: "#1e8e3e", B: "#d39200", C: "#98a3ae"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const url = u => /^https?:\/\//.test(u || "") ? u : "";
+let E = null, BUSCA = null, mapa = null, camada = null, conversa = null, vigia = null, ultimasOk = new Set();
+
+async function api(caminho, corpo) {
+  const op = {headers: {"X-Prospecta": TOKEN}};
+  if (corpo !== undefined) { op.method = "POST"; op.headers["Content-Type"] = "application/json"; op.body = JSON.stringify(corpo); }
+  const r = await fetch(caminho, op);
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (!r.ok) { const err = new Error((d && d.erro) || ("erro " + r.status)); err.dados = d || {}; throw err; }
+  return d;
+}
+function aviso(txt, ms = 4000) { const a = $("#aviso"); a.textContent = txt; a.classList.remove("oculto"); clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.add("oculto"), ms); }
+function km(v) { return (Math.round(v * 10) / 10).toString().replace(".", ",") + " km"; }
+
+// ── estado geral ──
+async function carregar() {
+  E = await api("/api/estado");
+  $("#motor-ponto").className = "ponto " + (E.motor ? "ok" : "mal");
+  $("#motor-txt").textContent = E.motor ? "motor de busca ligado" : "motor desligado (liga sozinho na busca)";
+  const sel = $("#b-perfil"), atual = sel.value;
+  sel.innerHTML = E.perfis.map(p => `<option value="${esc(p.chave)}">${esc(p.nome)}</option>`).join("") + '<option value="_outro">Outro (digitar o que procurar)</option>';
+  sel.value = atual || E.config.perfil || E.perfis[0].chave;
+  $("#b-raio").max = E.raio_maximo_km;
+  if (!carregar.feito) {
+    $("#b-raio").value = E.config.raio_km; $("#b-modo").value = E.config.modo;
+    $("#c-nome").value = E.config.meu_nome; $("#c-empresa").value = E.config.minha_empresa;
+    carregar.feito = true;
+  }
+  $("#c-base-atual").textContent = E.config.base ? "Atual: " + E.config.base.descricao : "";
+  atualizarRaio(); trocarPerfil(); desenharTarefas(E.tarefas); desenharHist(); desenharConta();
+  E.tarefas.filter(t => t.estado === "ok").forEach(t => ultimasOk.add(t.tarefa_id));
+  if (!BUSCA && E.buscas.length) abrirBusca(E.buscas[0].busca_id);
+  vigiar();
+}
+function atualizarRaio() { $("#b-raio-txt").textContent = km(+$("#b-raio").value); }
+function trocarPerfil() {
+  const outro = $("#b-perfil").value === "_outro";
+  $("#b-outro").classList.toggle("oculto", !outro);
+  const p = E && E.perfis.find(x => x.chave === $("#b-perfil").value);
+  $("#b-estimativa").textContent = p ? "Procura: " + p.alvos.join(", ") : "Dica: 5 a 12 tipos de negócio, como você digitaria no Google Maps.";
+}
+$("#b-raio").addEventListener("input", atualizarRaio);
+$("#b-perfil").addEventListener("change", trocarPerfil);
+
+$("#f-busca").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const outro = $("#b-perfil").value === "_outro";
+  const corpo = {endereco: $("#b-end").value, raio_km: +$("#b-raio").value, modo: $("#b-modo").value, so_novos: $("#b-novos").checked};
+  if (outro) Object.assign(corpo, {alvos: $("#b-alvos").value, servico: $("#b-servico").value, sinais: $("#b-sinais").value});
+  else corpo.perfil = $("#b-perfil").value;
+  $("#b-ir").disabled = true;
+  try {
+    const r = await api("/api/buscas", corpo);
+    aviso(`Busca iniciada: ~${r.estimativa_min} min. Pode fechar esta página; ela continua.`, 6000);
+    carregar();
+  } catch (e) { aviso("⚠️ " + e.message, 7000); }
+  finally { $("#b-ir").disabled = false; }
+});
+
+$("#f-config").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const corpo = {meu_nome: $("#c-nome").value, minha_empresa: $("#c-empresa").value};
+  if ($("#c-base").value.trim()) corpo.base_endereco = $("#c-base").value;
+  try { E.config = await api("/api/config", corpo); $("#c-base").value = ""; aviso("Dados salvos."); carregar(); if (BUSCA) abrirBusca(BUSCA.busca_id); }
+  catch (e) { aviso("⚠️ " + e.message, 6000); }
+});
+
+// ── tarefas ──
+function desenharTarefas(ts) {
+  const nomes = {fila: "na fila", rodando: "buscando", cancelar: "cancelando", ok: "pronta", erro: "erro", cancelada: "cancelada"};
+  const vis = ts.slice(0, 5);
+  $("#tarefas").innerHTML = vis.length ? vis.map(t => `
+    <div class="tarefa">
+      <div><b>${esc(nomes[t.estado] || t.estado)}</b> · ${esc(t.descricao)}</div>
+      ${["fila", "rodando", "cancelar"].includes(t.estado) ? `<div class="barra"><i style="width:${Math.max(3, t.progresso_pct)}%"></i></div>
+        <div class="dica">${esc(t.mensagem || "")} · ${t.lugares_lidos} lugares lidos · estimativa ~${esc(t.estimativa_min)} min
+        <button class="peq" data-cancelar="${t.tarefa_id}">Cancelar</button></div>`
+      : `<div class="dica">${esc(t.criada)} · ${esc(t.mensagem || "")} ${t.busca_id ? `<a href="#" data-abrir="${t.busca_id}">ver</a>` : ""}</div>`}
+    </div>`).join("") : '<p class="dica">Nenhuma busca recente.</p>';
+}
+$("#tarefas").addEventListener("click", async ev => {
+  const c = ev.target.dataset.cancelar, a = ev.target.dataset.abrir;
+  if (c) { ev.preventDefault(); try { await api(`/api/tarefas/${c}/cancelar`, {}); vigiar(true); } catch (e) { aviso(e.message); } }
+  if (a) { ev.preventDefault(); abrirBusca(+a); }
+});
+async function vigiar(agora) {
+  clearTimeout(vigia);
+  const ativos = () => E.tarefas.some(t => ["fila", "rodando", "cancelar"].includes(t.estado));
+  if (!agora && !ativos()) return;
+  vigia = setTimeout(async () => {
+    try {
+      E.tarefas = await api("/api/tarefas");
+      desenharTarefas(E.tarefas);
+      const novas = E.tarefas.filter(t => t.estado === "ok" && !ultimasOk.has(t.tarefa_id));
+      novas.forEach(t => ultimasOk.add(t.tarefa_id));
+      if (novas.length) { aviso("✅ Busca concluída: " + novas[0].mensagem, 7000); await carregar(); abrirBusca(novas[0].busca_id); return; }
+    } catch (e) {}
+    vigiar(ativos());
+  }, agora ? 300 : 3000);
+}
+
+// ── histórico e resultados ──
+function desenharHist() {
+  $("#hist").innerHTML = E.buscas.length ? E.buscas.map(b => `<li data-id="${b.busca_id}" class="${BUSCA && BUSCA.busca_id === b.busca_id ? "sel" : ""}">
+      <b>${esc(b.servico)}</b> · ${esc(b.raio_km)} km<small>${esc(b.local.slice(0, 70))}</small>
+      <small>${esc(b.data)} · ${b.total} empresas · ${b.prioridade_A} A · ${b.com_whatsapp} com WhatsApp</small></li>`).join("")
+    : '<li class="dica" style="cursor:default">Nenhuma ainda.</li>';
+}
+$("#hist").addEventListener("click", ev => { const li = ev.target.closest("li[data-id]"); if (li) abrirBusca(+li.dataset.id); });
+
+async function abrirBusca(id) {
+  try { BUSCA = await api(`/api/buscas/${id}`); } catch (e) { aviso(e.message); return; }
+  $("#res-vazio").classList.add("oculto"); $("#res-cheio").classList.remove("oculto");
+  $("#rota").classList.add("oculto"); $("#links-exp").textContent = "";
+  $("#res-titulo").textContent = `${BUSCA.servico}: ${BUSCA.itens.length} empresas`;
+  $("#res-sub").textContent = `${BUSCA.data} · até ${BUSCA.raio_km} km de ${BUSCA.local.descricao}` + (BUSCA.ocultos ? ` · ${BUSCA.ocultos} já vistas ocultadas` : "");
+  const it = BUSCA.itens;
+  const k = {"prioridade A": it.filter(p => p.prioridade === "A").length, "com WhatsApp": it.filter(p => p.whatsapp).length,
+             "com e-mail": it.filter(p => p.emails).length, "sem site próprio": it.filter(p => !p.site_proprio).length};
+  $("#res-kpis").innerHTML = Object.entries(k).map(([n, v]) => `<div class="kpi"><b>${v}</b>${esc(n)}</div>`).join("")
+    + BUSCA.avisos.map(a => `<div class="kpi" style="border-color:var(--erro)">⚠️ ${esc(a)}</div>`).join("");
+  const fs = $("#f-s");
+  if (fs.options.length <= 2) Object.entries(STATUS).slice(1).forEach(([v, t]) => fs.add(new Option(t, v)));
+  desenharHist(); desenharMapa(); desenharLista();
+}
+function desenharMapa() {
+  if (!window.L) { $("#mapa").classList.add("oculto"); return; }
+  if (!mapa) {
+    mapa = L.map("mapa");
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "© OpenStreetMap"}).addTo(mapa);
+  }
+  if (camada) camada.remove();
+  camada = L.layerGroup().addTo(mapa);
+  const c = BUSCA.local;
+  L.circle([c.lat, c.lon], {radius: BUSCA.raio_km * 1000, color: "#1f5fbf", weight: 1, fillOpacity: .04}).addTo(camada);
+  L.circleMarker([BUSCA.base.lat, BUSCA.base.lon], {radius: 8, color: "#1f5fbf", fillOpacity: 1}).addTo(camada).bindPopup("Saída das rotas");
+  BUSCA.itens.forEach((p, i) => L.circleMarker([p.lat, p.lon], {radius: 6, color: COR[p.prioridade], fillOpacity: .85}).addTo(camada)
+    .bindPopup(`<b>${i + 1}. ${esc(p.nome)}</b><br>${esc(p.categoria)}<br>${esc(p.telefone)}`));
+  mapa.fitBounds(L.latLng(c.lat, c.lon).toBounds(BUSCA.raio_km * 2200));
+  setTimeout(() => mapa.invalidateSize(), 50);
+}
+function desenharLista() {
+  const q = $("#f-q").value.toLowerCase(), fp = $("#f-p").value, fw = $("#f-w").value, fs = $("#f-s").value;
+  const vis = BUSCA.itens.map((p, i) => [p, i]).filter(([p]) =>
+    (!q || [p.nome, p.bairro, p.categoria, p.endereco].join(" ").toLowerCase().includes(q)) && (!fp || p.prioridade === fp)
+    && (!fw || p.whatsapp) && (fs === "*" || p.status === fs));
+  $("#lista").innerHTML = vis.length ? vis.slice(0, 300).map(([p, i]) => `
+    <div class="p ${esc(p.prioridade)}">
+      <div class="topo"><span class="nome">${i + 1}. ${esc(p.nome)}</span><span><b>${esc(p.prioridade)}</b> · ${esc(p.nota)}</span></div>
+      <div class="info">${esc(p.categoria)} · ${km(p.distancia_m / 1000)} · ${esc(p.bairro || p.endereco)}</div>
+      <div class="info">${[p.telefone && "📞 " + esc(p.telefone) + (p.whatsapp_status ? " (WhatsApp " + esc(p.whatsapp_status) + ")" : ""),
+        p.emails && "✉️ " + esc(p.emails), p.avaliacoes && "⭐ " + esc(p.nota_google) + " (" + esc(p.avaliacoes) + ")",
+        p.sinais && p.sinais.length && "🔥 " + esc(p.sinais.join(", "))].filter(Boolean).join(" · ")}</div>
+      ${p.obs ? `<div class="info">📝 ${esc(p.obs)}</div>` : ""}
+      <div class="botoes">
+        ${url(p.link_whatsapp) ? `<a class="wa" href="${esc(p.link_whatsapp)}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ""}
+        <a href="${esc(url(p.link_rota))}" target="_blank" rel="noopener">🗺️ Rota</a>
+        <a href="${esc(url(p.link_waze))}" target="_blank" rel="noopener">🚗 Waze</a>
+        ${url(p.link_maps) ? `<a href="${esc(p.link_maps)}" target="_blank" rel="noopener">📍 Maps</a>` : ""}
+        ${p.site_proprio && url(p.site) ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">🌐 Site</a>` : ""}
+        ${url(p.instagram) ? `<a href="${esc(p.instagram)}" target="_blank" rel="noopener">📸 Instagram</a>` : ""}
+        <select data-chave="${esc(p.chave)}">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}" ${p.status === v ? "selected" : ""}>${t}</option>`).join("")}</select>
+        <button class="peq" data-obs="${esc(p.chave)}">📝 Anotar</button>
+      </div>
+    </div>`).join("") : '<div class="vazio">Nenhuma empresa com esses filtros.</div>';
+}
+["#f-q", "#f-p", "#f-w", "#f-s"].forEach(s => $(s).addEventListener("input", desenharLista));
+$("#lista").addEventListener("change", async ev => {
+  const chave = ev.target.dataset.chave; if (!chave) return;
+  try { await api("/api/prospects/marcar", {chave, status: ev.target.value}); BUSCA.itens.find(p => p.chave === chave).status = ev.target.value; aviso("Status salvo."); }
+  catch (e) { aviso("⚠️ " + e.message); }
+});
+$("#lista").addEventListener("click", async ev => {
+  const chave = ev.target.dataset.obs; if (!chave) return;
+  const p = BUSCA.itens.find(x => x.chave === chave);
+  const obs = prompt(`Anotação sobre ${p.nome}:`, p.obs || ""); if (obs === null) return;
+  try { await api("/api/prospects/marcar", {chave, observacao: obs}); p.obs = obs; desenharLista(); } catch (e) { aviso("⚠️ " + e.message); }
+});
+$("#btn-rota").addEventListener("click", async () => {
+  try {
+    const r = await api(`/api/buscas/${BUSCA.busca_id}/rota?n=${$("#rota-n").value}`);
+    $("#rota").innerHTML = `<b>🗺️ Rota saindo de ${esc(r.saida)}</b><br>${r.paradas.map(p => esc(p.ordem + ". " + p.nome)).join(" → ")}<br>
+      ${esc(String(r.km).replace(".", ","))} km · ~${r.minutos_dirigindo} min dirigindo${r.estimado ? " (estimado)" : ""} · ~${r.minutos_com_visitas} min com visitas<br>`
+      + r.links_google_maps.map((l, i) => `<a href="${esc(url(l))}" target="_blank" rel="noopener">Abrir ${r.links_google_maps.length > 1 ? "trecho " + (i + 1) : "no Google Maps"}</a>`).join(" · ");
+    $("#rota").classList.remove("oculto");
+  } catch (e) { aviso("⚠️ " + e.message); }
+});
+$("#btn-exportar").addEventListener("click", async () => {
+  $("#btn-exportar").disabled = true;
+  try {
+    const r = await api(`/api/buscas/${BUSCA.busca_id}/exportar`, {});
+    const nomes = {relatorio: "relatório", planilha: "planilha", mapa: "mapa KML", resumo: "resumo"};
+    $("#links-exp").innerHTML = Object.entries(nomes).filter(([k]) => r.links[k]).map(([k, n]) => `<a href="${esc(r.links[k])}" target="_blank">${n}</a>`).join(" · ")
+      + `<br>Salvo em: ${esc(r.pasta)}`;
+  } catch (e) { aviso("⚠️ " + e.message); } finally { $("#btn-exportar").disabled = false; }
+});
+
+// ── conta ChatGPT e chat ──
+function desenharConta() {
+  const c = E.conta, dentro = c && c.plano && !c.desconectada;
+  $("#chat-fora").classList.toggle("oculto", !!(c && !c.desconectada));
+  $("#chat-sem-plano").classList.toggle("oculto", !(c && !c.plano && !c.desconectada));
+  $("#chat-dentro").classList.toggle("oculto", !dentro);
+  $("#conta-topo").innerHTML = c && !c.desconectada
+    ? `ChatGPT: ${esc(c.email || "conectado")} · <a href="#" id="lnk-outra">usar outra conta</a> · <a href="#" id="lnk-sair">sair</a>` : "";
+  if ($("#lnk-sair")) $("#lnk-sair").onclick = ev => { ev.preventDefault(); sair(); };
+  if ($("#lnk-outra")) $("#lnk-outra").onclick = ev => { ev.preventDefault(); location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}&nova=1`; };
+  if (dentro && !$("#modelo").options.length) carregarModelos();
+  if (dentro && !c.boas_vindas_vista) modal(`<h2>Você está usando seu plano do ChatGPT</h2>
+    <p>Os pedidos do assistente do Prospecta usam o seu plano do ChatGPT. Você acompanha e limita esse uso nas configurações do ChatGPT.</p>
+    <p><a href="${esc(E.gerenciar_uso)}" target="_blank" rel="noopener">Gerenciar uso</a></p><button class="prim" id="ok-boas">Entendi</button>`,
+    () => $("#ok-boas").onclick = async () => { fecharModal(); E.conta.boas_vindas_vista = true; api("/api/chat/boas-vindas", {}).catch(() => {}); });
+}
+$("#btn-entrar").onclick = () => location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}`;
+$("#btn-consentir").onclick = () => location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}&consentir=1`;
+$("#btn-sair2").onclick = () => sair();
+async function sair() { try { const r = await api("/auth/sair", {}); if (r.aviso) aviso(r.aviso, 8000); } catch (e) {} conversa = null; $("#msgs").innerHTML = ""; $("#modelo").innerHTML = ""; carregar(); }
+async function carregarModelos() {
+  try {
+    const ms = await api("/api/chat/modelos");
+    const salvo = localStorageGet("modelo");
+    $("#modelo").innerHTML = ms.map(m => `<option value="${esc(m.slug)}">${esc(m.nome)}</option>`).join("");
+    if (salvo && ms.some(m => m.slug === salvo)) $("#modelo").value = salvo;
+    if (!ms.length) bolha("erro", "Nenhum modelo disponível para esta conta.");
+  } catch (e) { bolha("erro", e.message); }
+}
+$("#modelo").addEventListener("change", () => localStorageSet("modelo", $("#modelo").value));
+function localStorageGet(k) { try { return localStorage.getItem("prospecta:" + k); } catch (e) { return null; } }
+function localStorageSet(k, v) { try { localStorage.setItem("prospecta:" + k, v); } catch (e) {} }
+function bolha(tipo, texto) { const d = document.createElement("div"); d.className = "msg " + tipo; d.textContent = texto; $("#msgs").appendChild(d); $("#msgs").scrollTop = 1e9; return d; }
+$("#btn-nova").onclick = () => { conversa = null; $("#msgs").innerHTML = ""; };
+$("#texto").addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("#entrada").requestSubmit(); } });
+$("#entrada").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const texto = $("#texto").value.trim(); if (!texto) return;
+  $("#texto").value = ""; bolha("eu", texto);
+  const espera = bolha("ia", "pensando…"); $("#btn-enviar").disabled = true;
+  try {
+    const r = await api("/api/chat", {conversa_id: conversa, mensagem: texto, modelo: $("#modelo").value});
+    conversa = r.conversa_id; espera.remove();
+    r.acoes.forEach(a => { const d = document.createElement("div"); d.className = "acao"; d.textContent = a.resumo; $("#msgs").appendChild(d); });
+    bolha("ia", r.resposta || "(sem resposta)");
+    if (r.atualizar) { await carregar(); if (BUSCA) abrirBusca(BUSCA.busca_id); vigiar(true); }
+  } catch (e) {
+    espera.remove();
+    const t = e.dados && e.dados.tipo;
+    if (t === "limite") {
+      const d = document.createElement("div"); d.className = "limite";
+      d.innerHTML = `<b>Limite de uso atingido</b><span class="dica">${esc(e.message)} Veja o limite do seu plano ou do Prospecta nas configurações do ChatGPT.</span><br><a class="prim" href="${esc(E.gerenciar_uso)}" target="_blank" rel="noopener">Gerenciar uso</a>`;
+      $("#msgs").appendChild(d);
+    } else {
+      bolha("erro", e.message);
+      if (t === "sessao") carregar();
+    }
+  } finally { $("#btn-enviar").disabled = false; $("#msgs").scrollTop = 1e9; }
+});
+
+// ── utilidades ──
+function modal(html, depois) { $("#modal-corpo").innerHTML = html; $("#modal").classList.remove("oculto"); if (depois) depois(); }
+function fecharModal() { $("#modal").classList.add("oculto"); }
+
+(function inicio() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("login_erro")) aviso("⚠️ " + q.get("login_erro"), 9000);
+  if (q.get("login") || q.get("login_erro")) history.replaceState(null, "", "/");
+  carregar().catch(e => aviso("Não consegui carregar o painel: " + e.message, 9000));
+})();
+</script>
+</body>
+</html>

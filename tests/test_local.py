@@ -128,7 +128,7 @@ class CLITest(unittest.TestCase):
         self.rodar("--perfil", "limpeza")
         codigo, saida = self.rodar("--perfil", "limpeza", "--so-novos")
         self.assertIn("0 prospects", saida)
-        self.assertIn("6 já recebidos", saida)
+        self.assertIn("6 já vistos ocultados", saida)
 
     def test_perfil_invalido(self):
         with self.assertRaises(SystemExit):

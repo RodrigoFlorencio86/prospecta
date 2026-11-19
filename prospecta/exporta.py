@@ -136,3 +136,44 @@ def salvar_kml(caminho, prospects, base, titulo="Prospects"):
     caminho = Path(caminho)
     caminho.write_text("\n".join(partes), encoding="utf-8")
     return caminho
+
+
+def salvar_resumo_md(caminho, b, perfil, base, prospects, dados, rota=None, top=15):
+    """Resumo curto em Markdown de uma busca salva (b), feito para o agente mostrar ao usuário."""
+    from . import busca as _busca
+    L = b["local"]
+    cont = {k: sum(p.prioridade == k for p in prospects) for k in "ABC"}
+    modo = _busca.MODOS.get(L.get("modo", "rapido"), {}).get("nome", L.get("modo", ""))
+    ocultos = L.get("ocultos") or 0
+    ls = [f"# Prospects: {perfil.nome}", "",
+          f"- **Local:** {L.get('descricao', '')}", f"- **Raio:** {b['raio_km']:g} km · modo {modo}",
+          f"- **Procurado:** {', '.join(perfil.alvos)}",
+          f"- **Encontrados:** {len(prospects)} (A: {cont['A']}, B: {cont['B']}, C: {cont['C']})"
+          + (f", {ocultos} já recebidos antes ocultados" if ocultos else ""),
+          f"- **Com WhatsApp:** {sum(bool(p.whatsapp) for p in prospects)} · **com e-mail:** "
+          f"{sum(bool(p.emails) for p in prospects)} · **sem site próprio:** {sum(not p.site_proprio for p in prospects)}"]
+    for av in b.get("avisos") or []:
+        ls.append(f"- ⚠️ {av}")
+    ls += ["", f"## Top {min(top, len(prospects))}", "",
+           "| # | Prior. | Nota | Nome | Categoria | Dist. | Bairro | Telefone | WhatsApp |",
+           "|---|---|---|---|---|---|---|---|---|"]
+
+    def lim(s):
+        return str(s or "").replace("|", "/").replace("\n", " ")
+
+    for i, (p, d) in enumerate(zip(prospects[:top], dados[:top]), 1):
+        wa = f"[abrir]({d['Abrir WhatsApp com mensagem']})" if d["Abrir WhatsApp com mensagem"] else "—"
+        ls.append(f"| {i} | {p.prioridade} | {p.nota} | {lim(p.nome)} | {lim(p.categoria)} | {p.distancia_km:.1f} km "
+                  f"| {lim(p.bairro)} | {lim(p.telefone) or '—'} | {wa} |")
+    if rota:
+        ls += ["", f"## Rota sugerida ({len(rota['ordem'])} paradas, saindo de {base.descricao})", "",
+               " → ".join(p.nome for p in rota["ordem"]), "",
+               f"{rota['km']:.1f} km, ~{rota['minutos_carro']} min dirigindo (estimado), ~{rota['minutos']} min com visitas."]
+        ls += [f"- [Abrir trecho {i} no Google Maps]({link})" for i, link in enumerate(rota["links"], 1)]
+    ls += ["", "## Arquivos", "", "- `relatorio.html`: abra no navegador (botões de WhatsApp, rota, mapa, status)",
+           "- `prospects.xlsx`: planilha completa com colunas para acompanhar os contatos",
+           "- `prospects.kml`: importe em mymaps.google.com para ver no mapa",
+           "- `prospects.json`: os mesmos dados para outros programas"]
+    caminho = Path(caminho)
+    caminho.write_text("\n".join(ls) + "\n", encoding="utf-8")
+    return caminho

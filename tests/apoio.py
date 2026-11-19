@@ -23,6 +23,9 @@ class MotorFalso:
         self.criados = []
         self.aviso = aviso
 
+    def saude(self):
+        return True
+
     def criar(self, nome, palavras, lat, lon, zoom, profundidade, avaliacoes=0, **k):
         self.criados.append({"palavras": palavras, "lat": lat, "lon": lon, "zoom": zoom, "prof": profundidade})
         return str(len(self.criados))

@@ -7,12 +7,27 @@ no computador dele. Fale em **português simples**, sem jargão, e faça você o
 Todos os comandos abaixo rodam **dentro desta pasta** (`prospecta-bot/`). No Windows, troque
 `python3` por `py`.
 
+## 0. Se você tem as ferramentas MCP `prospecta`
+
+Se o seu ambiente já mostra as ferramentas do servidor MCP `prospecta` (`iniciar_busca`,
+`estado_busca`, `consultar_prospects`, `planejar_rota`, `mensagem_whatsapp`, `marcar_prospect`,
+`exportar`…), **use-as em vez dos comandos abaixo**. As regras deste arquivo continuam valendo. Para
+o usuário ver tudo com mapa e botões, ofereça também o painel: `python3 -m prospecta painel`.
+
 ## 1. Instalação (uma vez)
 
 ```bash
 python3 --version              # precisa ser 3.9 ou mais novo
-python3 -m prospecta instalar  # baixa o motor de busca, liga e confere
+python3 -m prospecta instalar --sem-painel   # baixa o motor de busca, liga e confere
 ```
+
+Depois da instalação, ofereça ao usuário três jeitos de seguir:
+
+- **Painel no navegador**: `python3 -m prospecta painel` (deixa o terminal ocupado; rode em segundo
+  plano se puder). Tem busca, mapa, contatos e um assistente que usa o plano do ChatGPT dele.
+- **Ferramentas MCP no Claude Code ou no Codex**: `python3 -m prospecta conectar claude` (ou
+  `codex`). Depois, reinicie o agente.
+- **Você mesmo roda as buscas**, pelos comandos abaixo.
 
 - Sem Python: oriente a instalar em https://www.python.org/downloads/ (no Windows, marcar "Add
   python.exe to PATH") e tente de novo.
@@ -64,7 +79,6 @@ Outras opções:
 - `--base "endereço da empresa"`: ponto de partida das rotas, quando ele é diferente do centro da busca.
 - `--modo completo`: mais resultados e leitura das avaliações (sinais), mas várias vezes mais lento.
 - `--so-novos`: esconde quem já apareceu em buscas anteriores. Bom para repetir a busca todo mês.
-- `--rota N`: quantos dos melhores entram na rota sugerida (padrão 10).
 
 **Antes de rodar**, diga ao usuário a estimativa de tempo que o comando imprime (em geral, de 5 a
 30 minutos). Rode em segundo plano se o seu ambiente permitir e avise quando terminar. **Uma busca
@@ -72,7 +86,7 @@ por vez**, e no máximo umas 10 por dia: o Google bloqueia temporariamente quem 
 
 ## 4. Mostrar o resultado
 
-O comando cria uma pasta em `resultados/<data>_<serviço>_<local>/` com:
+O comando cria uma pasta em `resultados/<data>_<serviço>_<local>_<n>/` com:
 
 | Arquivo | Para quê |
 |---|---|
@@ -109,6 +123,7 @@ O comando cria uma pasta em `resultados/<data>_<serviço>_<local>/` com:
 - Busque só negócios no Google Maps. Não raspe Instagram, Facebook ou outras redes.
 - Não aumente limites (raio, buscas por dia) para "ir mais rápido". Se o Google bloquear, espere
   algumas horas.
+- Nunca leia, mostre ou copie as credenciais do ChatGPT (`~/.config/prospecta/contas.json`).
 
 ## Problemas comuns
 
@@ -124,11 +139,14 @@ O comando cria uma pasta em `resultados/<data>_<serviço>_<local>/` com:
 ## Referência
 
 ```
-python3 -m prospecta instalar | verificar | perfis [--json]
+python3 -m prospecta instalar [--sem-painel] | verificar | perfis [--json]
+python3 -m prospecta painel [--porta N] [--nao-abrir]
+python3 -m prospecta conectar claude|codex     # registra o servidor MCP
+python3 -m prospecta chatgpt status|sair       # conta do ChatGPT do assistente do painel
 python3 -m prospecta motor ligar|desligar|status|reiniciar
 python3 -m prospecta buscar ENDEREÇO [--raio KM] (--perfil CHAVE | --alvos "a, b") [--servico ...]
         [--sinais "a, b"] [--mensagem "..."] [--empresa "Nome | Empresa"] [--base ENDEREÇO]
-        [--modo rapido|completo] [--so-novos] [--rota N] [--top N]
+        [--modo rapido|completo] [--so-novos] [--top N] [--saida PASTA]
 python3 -m prospecta bot      # opcional: o mesmo pelo Telegram (veja README)
 ```
 

@@ -31,6 +31,7 @@ class Config:
     motor_url: str = "http://localhost:8080"
     motor_chave: str = ""
     pasta_dados: Path = RAIZ / "dados"
+    pasta_resultados: Path = RAIZ / "resultados"
     nominatim_url: str = "https://nominatim.openstreetmap.org"
     contato_geocoder: str = ""
     osrm_url: str = ""
@@ -47,6 +48,7 @@ class Config:
             motor_url=e("MOTOR_URL", "http://localhost:8080").rstrip("/"),
             motor_chave=e("MOTOR_CHAVE", ""),
             pasta_dados=Path(e("PASTA_DADOS", str(RAIZ / "dados"))),
+            pasta_resultados=Path(e("PASTA_RESULTADOS", str(RAIZ / "resultados"))),
             nominatim_url=e("NOMINATIM_URL", "https://nominatim.openstreetmap.org").rstrip("/"),
             contato_geocoder=e("CONTATO_GEOCODER", ""),
             osrm_url=e("OSRM_URL", "").rstrip("/"),
