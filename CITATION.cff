@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "Se o Prospecta for útil no seu trabalho, por favor cite o autor."
+title: "Prospecta: prospecção B2B no Google Maps para autônomos, com WhatsApp, rota de visitas e IA"
+abstract: >-
+  Ferramenta gratuita e de código aberto que encontra empresas num raio em volta de um endereço,
+  prioriza os prospects, prepara mensagens de WhatsApp e monta rotas de visita, com assistente
+  de IA (Claude e ChatGPT).
+type: software
+authors:
+  - given-names: Rodrigo
+    family-names: Florencio
+    affiliation: "GenSearch Me"
+    website: "https://www.linkedin.com/in/rodrigoflorencio/"
+repository-code: "https://github.com/RodrigoFlorencio86/prospecta"
+url: "https://github.com/RodrigoFlorencio86/prospecta"
+license: MIT
+version: "0.2.4"
+date-released: "2026-11-20"
+keywords:
+  - prospecção B2B
+  - geração de leads
+  - Google Maps
+  - WhatsApp
+  - autônomos
+  - pequenas empresas
+  - inteligência artificial
