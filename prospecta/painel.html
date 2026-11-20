@@ -72,7 +72,13 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 #msgs { flex:1; overflow:auto; display:flex; flex-direction:column; gap:10px; padding:4px 2px 10px; }
 .msg { max-width:92%; padding:8px 11px; border-radius:12px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:.92rem; }
 .msg.eu { align-self:flex-end; background:var(--azul); color:#fff; border-bottom-right-radius:4px; }
-.msg.ia { align-self:flex-start; background:var(--fundo); border:1px solid var(--linha); border-bottom-left-radius:4px; }
+.msg.ia { align-self:flex-start; background:var(--fundo); border:1px solid var(--linha); border-bottom-left-radius:4px; white-space:normal; }
+.msg.ia p { margin:0 0 .55em; } .msg.ia > :last-child { margin-bottom:0; }
+.msg.ia ul, .msg.ia ol { margin:0 0 .55em; padding-left:1.3em; } .msg.ia li { margin:.15em 0; }
+.msg.ia .tit { font-weight:700; } .msg.ia hr { border:0; border-top:1px solid var(--linha); margin:.6em 0; }
+.msg.ia code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:.85em; background:var(--azul-claro); padding:0 .25em; border-radius:4px; }
+.msg.ia .tabela { overflow-x:auto; margin:0 0 .55em; } .msg.ia table { border-collapse:collapse; font-size:.85em; }
+.msg.ia th, .msg.ia td { border:1px solid var(--linha); padding:3px 6px; text-align:left; vertical-align:top; }
 .msg.erro { align-self:stretch; background:transparent; border:1px solid var(--erro); color:var(--erro); }
 .acao { align-self:flex-start; font-size:.78rem; color:var(--suave); border:1px dashed var(--linha); border-radius:8px; padding:3px 8px; }
 #entrada { display:flex; gap:8px; margin-top:8px; }
@@ -476,7 +482,58 @@ async function carregarModelos() {
 $("#modelo").addEventListener("change", () => localStorageSet("modelo", $("#modelo").value));
 function localStorageGet(k) { try { return localStorage.getItem("prospecta:" + k); } catch (e) { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem("prospecta:" + k, v); } catch (e) {} }
-function bolha(tipo, texto) { const d = document.createElement("div"); d.className = "msg " + tipo; d.textContent = texto; $("#msgs").appendChild(d); $("#msgs").scrollTop = 1e9; return d; }
+function bolha(tipo, texto) {
+  const d = document.createElement("div"); d.className = "msg " + tipo;
+  if (tipo === "ia") d.innerHTML = md(texto); else d.textContent = texto;
+  $("#msgs").appendChild(d); $("#msgs").scrollTop = 1e9; return d;
+}
+// Markdown simples das respostas da IA. O texto é escapado ANTES; só geramos tags fixas e links http(s).
+const LINK = (url, txt) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
+function mdLinha(t) {
+  const codigos = [];
+  t = t.replace(/`([^`]+)`/g, (_, c) => `\u0000${codigos.push(c) - 1}\u0000`);
+  t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, txt, url) => LINK(url, txt))
+       .replace(/(^|[\s(])(https?:\/\/[^\s<]*[^\s<.,;:!?)])/g, (_, a, url) => a + LINK(url, url))
+       .replace(/\*\*(?=\S)(.+?)\*\*/g, "<b>$1</b>").replace(/__(?=\S)(.+?)__/g, "<b>$1</b>")
+       .replace(/(^|[^*\w])\*(?=\S)([^*]+?)\*(?!\w)/g, "$1<i>$2</i>")
+       .replace(/~~(.+?)~~/g, "<s>$1</s>");
+  return t.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codigos[i]}</code>`);
+}
+function md(texto) {
+  const linhas = esc(texto).split(/\r?\n/);
+  let html = "", lista = null, par = [], tabela = [];
+  const fechaPar = () => { if (par.length) html += "<p>" + par.map(mdLinha).join("<br>") + "</p>"; par = []; };
+  const fechaLista = () => { if (lista) html += `</li></${lista}>`; lista = null; };
+  const celulas = l => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => mdLinha(c.trim()));
+  const fechaTabela = () => {
+    if (!tabela.length) return;
+    const corpo = tabela.filter(l => !/^\s*\|?\s*:?-{2,}/.test(l));
+    html += '<div class="tabela"><table>' + corpo.map((l, i) => "<tr>" + celulas(l).map(c => i ? `<td>${c}</td>` : `<th>${c}</th>`).join("") + "</tr>").join("") + "</table></div>";
+    tabela = [];
+  };
+  const fecha = () => { fechaPar(); fechaLista(); fechaTabela(); };
+  for (const l of linhas) {
+    let m;
+    if (!l.trim()) { fecha(); continue; }
+    if (/^\s*\|.*\|\s*$/.test(l)) { fechaPar(); fechaLista(); tabela.push(l); continue; }
+    fechaTabela();
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l)) { fecha(); html += "<hr>"; continue; }
+    if ((m = l.match(/^\s*#{1,6}\s+(.*)$/))) { fecha(); html += `<p class="tit">${mdLinha(m[1])}</p>`; continue; }
+    const ul = l.match(/^\s*[-*•]\s+(.*)$/), ol = l.match(/^\s*(\d{1,3})[.)]\s+(.*)$/);
+    if (ul || ol) {
+      const tipo = ul ? "ul" : "ol";
+      fechaPar();
+      if (lista !== tipo) { fechaLista(); html += tipo === "ol" && ol[1] !== "1" ? `<ol start="${+ol[1]}"><li>` : `<${tipo}><li>`; lista = tipo; }
+      else html += "</li><li>";
+      html += mdLinha(ul ? ul[1] : ol[2]);
+      continue;
+    }
+    if (lista && /^\s+/.test(l)) { html += "<br>" + mdLinha(l.trim()); continue; }  // continuação do item
+    fechaLista(); par.push(l);
+  }
+  fecha();
+  return html;
+}
 function acaoChip(texto) { const d = document.createElement("div"); d.className = "acao"; d.textContent = texto; $("#msgs").appendChild(d); }
 function buscaPorId(id) { return E && id ? E.buscas.find(b => b.busca_id === id) : null; }
 function curto(local) { return String(local || "").split(",").slice(0, 2).join(",").trim(); }
