@@ -15,9 +15,10 @@ from .ferramentas import FERRAMENTAS, chamar, schema
 
 API = "https://api.openai.com/v1"
 MAX_RODADAS = 10
-MAX_SAIDA_FERRAMENTA = 12_000
+MAX_SAIDA_FERRAMENTA = 60_000  # ~100 empresas resumidas cabem inteiras
 MAX_ITENS_HISTORICO = 80
-SO_FORA_DO_PAINEL = {"abrir_painel"}  # o chat já está dentro do painel
+SO_FORA_DO_PAINEL = {"abrir_painel"}
+COM_BUSCA = {"consultar_prospects", "planejar_rota", "exportar", "detalhar_prospect"}  # o chat já está dentro do painel
 FERRAMENTAS_QUE_MUDAM = {"iniciar_busca", "cancelar_busca", "marcar_prospect", "configurar", "exportar"}
 
 
@@ -34,13 +35,14 @@ def namespace_ferramentas():
                        for f in FERRAMENTAS if f["nome"] not in SO_FORA_DO_PAINEL]}]
 
 
-def instrucoes(config):
+def instrucoes(config, busca_aberta=None):
     hoje = time.strftime("%d/%m/%Y")
     quem = ", ".join(x for x in (config.get("meu_nome"), config.get("minha_empresa")) if x) or "não informado"
     base = (config.get("base") or {}).get("descricao") or "não informada (rotas saem do endereço da busca)"
     return f"""Você é o assistente do Prospecta, que ajuda um profissional autônomo brasileiro a encontrar e \
 organizar empresas que podem contratar o serviço dele (prospecção B2B) perto de um endereço. Hoje é {hoje}.
 Usuário: {quem}. Endereço-base das rotas: {base}. Raio padrão: {config.get('raio_km')} km.
+{_aberta(busca_aberta)}
 
 Como trabalhar:
 - Fale em português do Brasil, simples e direto, sem jargão. Respostas curtas; use listas quando ajudar.
@@ -55,7 +57,17 @@ a conversa: você nunca envia mensagens nem sugere disparos em massa.
 - Marque status e observações quando o usuário contar o resultado de um contato (marcar_prospect).
 - LGPD: dados públicos de empresas, para contato comercial; o usuário deve se identificar e respeitar quem \
 pedir para não ser contatado. Não colete dados pessoais além do necessário.
+- Perguntas sobre "essa busca", "os resultados" ou empresas na tela referem-se à busca aberta no painel. Para \
+responder, leia os dados com consultar_prospects (sem filtros para ver tudo, limite=100, todas as páginas) e julgue \
+você mesmo por nome, categoria e site; não dependa de achar a palavra exata. Deixe claro quando é uma inferência.
 - Ao citar um prospect, use o nome e a distância; não mostre a 'chave' ao usuário."""
+
+
+def _aberta(b):
+    if not b:
+        return "Nenhuma busca aberta no painel agora."
+    return (f"Busca aberta no painel agora: busca_id={b.get('busca_id')} ({b.get('servico')}, {b.get('total')} "
+            f"empresas, até {b.get('raio_km')} km de {b.get('local')}).")
 
 
 def _erro_http(status, corpo):
@@ -189,7 +201,7 @@ class AgenteChat:
         except ErroLogin as ex:
             raise ErroChat(str(ex), "sessao") from ex
 
-    def enviar(self, conversa, texto, modelo):
+    def enviar(self, conversa, texto, modelo, busca_aberta=None):
         """Uma mensagem do usuário -> {"resposta", "acoes", "atualizar"}."""
         if not modelo:
             raise ErroChat("Escolha um modelo.", "modelo")
@@ -202,7 +214,7 @@ class AgenteChat:
                 except ErroLogin as ex:
                     self._desfazer(conversa)
                     raise ErroChat(str(ex), "sessao") from ex
-                corpo = {"model": modelo, "instructions": instrucoes(self.app.configuracao()),
+                corpo = {"model": modelo, "instructions": instrucoes(self.app.configuracao(), self._busca_info(busca_aberta)),
                          "input": conversa.historico, "tools": namespace_ferramentas(), "store": False, "stream": True}
                 try:
                     resp = self.cliente.responder(token, corpo)
@@ -222,10 +234,10 @@ class AgenteChat:
                         args = json.loads(ch.get("arguments") or "{}")
                     except ValueError:
                         args = None
+                    if busca_aberta and isinstance(args, dict) and nome in COM_BUSCA and not args.get("busca_id"):
+                        args["busca_id"] = int(busca_aberta)  # "essa busca" = a que está na tela
                     resultado, erro = chamar(self.app, nome, args)
-                    saida_txt = json.dumps(resultado, ensure_ascii=False, default=str)
-                    if len(saida_txt) > MAX_SAIDA_FERRAMENTA:
-                        saida_txt = saida_txt[:MAX_SAIDA_FERRAMENTA] + "… (cortado; use filtros ou limite menor)"
+                    saida_txt = _caber(resultado)
                     conversa.historico.append({"type": "function_call_output", "call_id": ch.get("call_id"),
                                                "output": saida_txt})
                     acoes.append({"ferramenta": nome, "erro": erro, "resumo": _resumo_acao(nome, args, resultado, erro)})
@@ -233,6 +245,18 @@ class AgenteChat:
             self._aparar(conversa)
             return {"resposta": "Parei aqui para não gastar demais seu plano. Quer que eu continue?",
                     "acoes": acoes, "atualizar": atualizar}
+
+    def _busca_info(self, busca_id):
+        if not busca_id:
+            return None
+        try:
+            b = self.app.db.busca(0, int(busca_id))
+        except (TypeError, ValueError):
+            return None
+        if not b:
+            return None
+        return {"busca_id": b["id"], "servico": b["perfil"], "total": len(b["itens"]), "raio_km": b["raio_km"],
+                "local": b["local"].get("descricao", "")}
 
     @staticmethod
     def _desfazer(conversa):
@@ -251,6 +275,24 @@ class AgenteChat:
         while corte < len(h) and h[corte].get("role") != "user":  # começa sempre numa mensagem do usuário
             corte += 1
         del h[:corte]
+
+
+def _caber(resultado):
+    """JSON do resultado dentro do limite. Listas de empresas perdem itens do fim (nunca um corte no meio do
+    JSON), com aviso para pedir a próxima página."""
+    txt = json.dumps(resultado, ensure_ascii=False, default=str)
+    if len(txt) <= MAX_SAIDA_FERRAMENTA:
+        return txt
+    if isinstance(resultado, dict) and isinstance(resultado.get("prospects"), list):
+        r = dict(resultado)
+        lista = list(r["prospects"])
+        while lista and len(txt) > MAX_SAIDA_FERRAMENTA:
+            lista = lista[:max(0, len(lista) - max(1, len(lista) // 10))]
+            r["prospects"] = lista
+            r["aviso"] = f"lista cortada em {len(lista)} itens por tamanho; peça limite menor ou a próxima página"
+            txt = json.dumps(r, ensure_ascii=False, default=str)
+        return txt
+    return json.dumps({"erro": "resultado grande demais; use filtros ou limite menor"}, ensure_ascii=False)
 
 
 def _texto(itens):

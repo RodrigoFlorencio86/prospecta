@@ -267,7 +267,7 @@ class Manipulador(BaseHTTPRequestHandler):
             texto = (d.get("mensagem") or "").strip()
             if not texto:
                 raise ErroFerramenta("mensagem vazia")
-            r = agente.enviar(conversa, texto, d.get("modelo"))
+            r = agente.enviar(conversa, texto, d.get("modelo"), busca_aberta=d.get("busca_id"))
             return self._enviar(200, dict(r, conversa_id=conversa.id))
         if caminho == "/api/chat/boas-vindas":
             srv.auth.marcar_boas_vindas()

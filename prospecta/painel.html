@@ -474,7 +474,8 @@ $("#entrada").addEventListener("submit", async ev => {
   $("#texto").value = ""; bolha("eu", texto);
   const espera = bolha("ia", "pensando…"); $("#btn-enviar").disabled = true;
   try {
-    const r = await api("/api/chat", {conversa_id: conversa, mensagem: texto, modelo: $("#modelo").value});
+    const r = await api("/api/chat", {conversa_id: conversa, mensagem: texto, modelo: $("#modelo").value,
+                                       busca_id: BUSCA ? BUSCA.busca_id : null});
     conversa = r.conversa_id; espera.remove();
     r.acoes.forEach(a => { const d = document.createElement("div"); d.className = "acao"; d.textContent = a.resumo; $("#msgs").appendChild(d); });
     bolha("ia", r.resposta || "(sem resposta)");

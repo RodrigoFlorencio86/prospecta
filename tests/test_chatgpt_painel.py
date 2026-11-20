@@ -175,6 +175,20 @@ class ChatTest(BaseOpenAI):
         self.agente.enviar(c, "e agora?", "gpt-teste")
         self.assertEqual(self.oa.pedidos_responses[-2]["input"][0], {"role": "user", "content": "quais os melhores?"})
 
+    def test_conversa_sobre_a_busca_aberta(self):
+        """O chat sabe qual busca está na tela e a usa quando o modelo não diz qual."""
+        bid = self.app.db.busca(0)["id"]
+        tid = self.app.iniciar_busca("Rua B", raio_km=1, perfil="ti")["tarefa_id"]  # outra busca, mais nova
+        esperar_tarefa(self.app, tid)
+        self.assertNotEqual(self.app.db.busca(0)["id"], bid)
+        vistos = []
+        original = self.app.consultar_prospects
+        self.app.consultar_prospects = lambda **k: (vistos.append(k), original(**k))[1]
+        r = self.agente.enviar(self.agente.conversa(), "quais dessas parecem fundos?", "gpt-teste", busca_aberta=bid)
+        self.assertEqual(vistos[0]["busca_id"], bid)
+        self.assertIn(f"busca_id={bid}", self.oa.pedidos_responses[0]["instructions"])
+        self.assertRegex(r["resposta"], r"Achei \d+ prospects A")
+
     def test_limite_de_uso(self):
         self.oa.limite = True
         c = self.agente.conversa()
@@ -189,6 +203,17 @@ class ChatTest(BaseOpenAI):
         with self.assertRaises(chat.ErroChat) as ctx:
             self.agente.enviar(self.agente.conversa(), "oi", "gpt-teste")
         self.assertEqual(ctx.exception.tipo, "sessao")
+
+
+class CaberTest(unittest.TestCase):
+    def test_lista_grande_e_cortada_por_itens(self):
+        r = {"total_filtrado": 500, "prospects": [{"nome": "x" * 300, "n": i} for i in range(500)]}
+        txt = chat._caber(r)
+        d = json.loads(txt)  # sempre JSON válido
+        self.assertLessEqual(len(txt), chat.MAX_SAIDA_FERRAMENTA)
+        self.assertLess(len(d["prospects"]), 500)
+        self.assertIn("próxima página", d["aviso"])
+        self.assertEqual(json.loads(chat._caber({"ok": 1})), {"ok": 1})
 
 
 class FerramentasTest(unittest.TestCase):
@@ -215,6 +240,24 @@ class FerramentasTest(unittest.TestCase):
         self.assertTrue(Path(exp["arquivos"]["relatorio"]).is_file())
         self.assertEqual(self.app.resumo_funil()["em_andamento"][0]["observacao"], "ligar segunda")
         self.assertEqual(self.app.busca_completa(bid)["servico"], "Fornos")
+
+    def test_campos_vazios_nao_filtram(self):
+        """Modelos mandam todos os campos opcionais com "", 0 ou false: isso não pode zerar a consulta."""
+        tid = self.app.iniciar_busca("Rua A", raio_km=1.5, perfil="limpeza")["tarefa_id"]
+        esperar_tarefa(self.app, tid)
+        total = len(self.app.db.busca(0)["itens"])
+        vazios = {"busca_id": 0, "prioridade": "", "whatsapp": "qualquer", "email": "qualquer", "texto": "",
+                  "bairro": "", "status": "qualquer", "max_km": 0, "min_avaliacoes": 0, "ordenar": "nota",
+                  "limite": 0, "pagina": 0, "com_whatsapp": None}
+        r, erro = chamar(self.app, "consultar_prospects", vazios)
+        self.assertFalse(erro)
+        self.assertEqual((r["total_filtrado"], r["filtros_aplicados"]), (total, {}))
+        r, _ = chamar(self.app, "consultar_prospects", {"whatsapp": "nao"})
+        self.assertEqual(r["total_filtrado"], 0)  # todas as empresas do teste têm celular
+        self.assertIn("dica", r)
+        r, _ = chamar(self.app, "consultar_prospects", {"whatsapp": "sim", "status": "sem_status", "max_km": 0.5})
+        self.assertEqual(r["filtros_aplicados"], {"whatsapp": True, "max_km": 0.5, "status": "sem_status"})
+        self.assertTrue(all(p["distancia_km"] <= 0.5 for p in r["prospects"]))
 
     def test_erros_viram_mensagem(self):
         res, erro = chamar(self.app, "iniciar_busca", {"endereco": "lugar que nada existe", "perfil": "ti"})

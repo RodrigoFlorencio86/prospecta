@@ -367,45 +367,64 @@ class Prospecta:
             rs = self.db.con.execute("SELECT chave, status, obs FROM prospects WHERE chat_id=?", (EU,)).fetchall()
         return {r["chave"]: (r["status"] or "", r["obs"] or "") for r in rs}
 
-    def consultar_prospects(self, busca_id=None, prioridade=None, com_whatsapp=None, com_email=None, texto=None,
+    def consultar_prospects(self, busca_id=None, prioridade=None, whatsapp=None, email=None, texto=None,
                             bairro=None, status=None, max_km=None, min_avaliacoes=None, ordenar="nota", limite=20,
-                            pagina=1):
-        b = self._busca(busca_id)
+                            pagina=1, com_whatsapp=None, com_email=None):
+        """Filtros vazios não filtram: modelos costumam mandar todos os campos com "", 0 ou false."""
+        b = self._busca(busca_id or None)
         st = self._status()
-        itens = []
-        for i, d in enumerate(b["itens"]):
-            s, obs = st.get(d["chave"], ("", ""))
-            itens.append((i, d, s, obs))
+        whatsapp = _trinario(whatsapp if whatsapp is not None else com_whatsapp)
+        email = _trinario(email if email is not None else com_email)
+        prioridade = "".join(c for c in str(prioridade or "").upper() if c in "ABC") or None
+        texto = (texto or "").strip().lower() or None
+        bairro = (bairro or "").strip().lower() or None
+        status = None if status in (None, "", "qualquer", "todos") else ("" if status in ("sem_status", "nenhum") else status)
+        max_km = _num(max_km) or None
+        min_avaliacoes = _num(min_avaliacoes) or None
+        aplicados = {k: v for k, v in (("prioridade", prioridade), ("whatsapp", whatsapp), ("email", email),
+                                       ("texto", texto), ("bairro", bairro), ("max_km", max_km),
+                                       ("min_avaliacoes", min_avaliacoes)) if v is not None}
+        if status is not None:
+            aplicados["status"] = status or "sem_status"
 
-        def ok(i, d, s, obs):
-            if prioridade and d["prioridade"] not in str(prioridade).upper():
+        def ok(d, s):
+            if prioridade and d["prioridade"] not in prioridade:
                 return False
-            if com_whatsapp is not None and bool(d["whatsapp"]) != bool(com_whatsapp):
+            if whatsapp is not None and bool(d["whatsapp"]) != whatsapp:
                 return False
-            if com_email is not None and bool(d["emails"]) != bool(com_email):
+            if email is not None and bool(d["emails"]) != email:
                 return False
-            if texto and str(texto).lower() not in " ".join(str(d.get(k, "")) for k in
-                                                              ("nome", "categoria", "alvo", "endereco", "bairro")).lower():
+            if texto and texto not in " ".join(str(d.get(k, "")) for k in
+                                               ("nome", "categoria", "alvo", "endereco", "bairro", "site")).lower():
                 return False
-            if bairro and str(bairro).lower() not in (d.get("bairro") or "").lower():
+            if bairro and bairro not in (d.get("bairro") or "").lower():
                 return False
-            if status is not None and s != ("" if status in ("", "sem_status", "nenhum") else status):
+            if status is not None and s != status:
                 return False
-            if max_km is not None and d["distancia_m"] > float(max_km) * 1000:
+            if max_km is not None and d["distancia_m"] > max_km * 1000:
                 return False
-            if min_avaliacoes is not None and _num(d.get("avaliacoes")) < float(min_avaliacoes):
+            if min_avaliacoes is not None and _num(d.get("avaliacoes")) < min_avaliacoes:
                 return False
             return True
 
-        filtrados = [x for x in itens if ok(*x)]
+        filtrados = []
+        for i, d in enumerate(b["itens"]):
+            s, obs = st.get(d["chave"], ("", ""))
+            if ok(d, s):
+                filtrados.append((i, d, s, obs))
         chaves = {"nota": lambda x: (-x[1]["nota"], x[1]["distancia_m"]), "distancia": lambda x: x[1]["distancia_m"],
                   "avaliacoes": lambda x: -_num(x[1].get("avaliacoes"))}
         filtrados.sort(key=chaves.get(ordenar, chaves["nota"]))
-        limite = max(1, min(int(limite or 20), 100))
-        ini = (max(1, int(pagina or 1)) - 1) * limite
-        return {"busca_id": b["id"], "total_na_busca": len(b["itens"]), "total_filtrado": len(filtrados),
-                "pagina": max(1, int(pagina or 1)),
-                "prospects": [_compacto(i, d, s, obs) for i, d, s, obs in filtrados[ini:ini + limite]]}
+        limite = max(1, min(int(_num(limite) or 20), 100))
+        pagina = max(1, int(_num(pagina) or 1))
+        ini = (pagina - 1) * limite
+        r = {"busca_id": b["id"], "servico": b["perfil"], "local": b["local"].get("descricao", ""),
+             "total_na_busca": len(b["itens"]), "total_filtrado": len(filtrados), "filtros_aplicados": aplicados,
+             "pagina": pagina, "paginas": max(1, -(-len(filtrados) // limite)),
+             "prospects": [_compacto(i, d, s, obs) for i, d, s, obs in filtrados[ini:ini + limite]]}
+        if not filtrados and b["itens"]:
+            r["dica"] = "Nenhum resultado com esses filtros; repita sem filtros (sem argumentos além de busca_id)."
+        return r
 
     def busca_completa(self, busca_id=None):
         """Tudo de uma busca para o painel: itens com status, mensagem e links prontos."""
@@ -586,6 +605,14 @@ class TravaArquivo:
         return True
 
 
+def _trinario(v):
+    """'sim'/'nao'/'qualquer' (ou bool) -> True/False/None."""
+    if isinstance(v, bool):
+        return v
+    v = str(v or "").strip().lower()
+    return True if v in ("sim", "s", "true", "1") else False if v in ("nao", "não", "n", "false", "0") else None
+
+
 def _num(v):
     try:
         return float(v or 0)
@@ -593,8 +620,15 @@ def _num(v):
         return 0.0
 
 
+def _dominio(url):
+    import urllib.parse
+    host = urllib.parse.urlsplit(url if "://" in (url or "") else f"http://{url or ''}").hostname or ""
+    return host[4:] if host.startswith("www.") else host
+
+
 def _compacto(i, d, status, obs):
-    return {"n": i + 1, "chave": d["chave"], "nome": d["nome"], "categoria": d["categoria"], "bairro": d["bairro"],
+    return {"n": i + 1, "chave": d["chave"], "nome": d["nome"], "categoria": d["categoria"], "buscado_como": d.get("alvo", ""),
+            "site": _dominio(d.get("site")) if d.get("site_proprio") else "", "bairro": d["bairro"],
             "distancia_km": round(d["distancia_m"] / 1000, 1), "telefone": d["telefone"],
             "whatsapp": d["whatsapp_status"] or "", "email": d["emails"], "instagram": bool(d["instagram"]),
             "site_proprio": d["site_proprio"], "nota": d["nota"], "prioridade": d["prioridade"],
@@ -647,19 +681,26 @@ FERRAMENTAS = [
     {"nome": "listar_buscas", "metodo": "listar_buscas", "descricao": "Buscas concluídas, da mais nova para a mais antiga.",
      "parametros": {"limite": {"type": "integer"}}},
     {"nome": "consultar_prospects", "metodo": "consultar_prospects",
-     "descricao": ("Lista e filtra os prospects de uma busca (sem busca_id: a última). Devolve dados resumidos; "
-                   "use detalhar_prospect para links e mensagem."),
-     "parametros": {"busca_id": {"type": "integer"},
+     "descricao": ("Lista e filtra as empresas (prospects) de uma busca concluída; sem busca_id, usa a busca aberta no "
+                   "painel ou a última. Mande SÓ os filtros que o usuário pediu: campos omitidos não filtram. Para "
+                   "analisar ou classificar a busca toda (ex.: 'quais parecem fundos de venture capital?'), chame sem "
+                   "filtros com limite=100 e percorra as páginas, julgando por nome, categoria e site. Devolve dados "
+                   "resumidos; use detalhar_prospect para links e mensagem."),
+     "parametros": {"busca_id": {"type": "integer", "description": "omita para a busca aberta/última"},
                     "prioridade": dict(_TXT, description="A, B, C ou combinação como 'AB'"),
-                    "com_whatsapp": {"type": "boolean"}, "com_email": {"type": "boolean"},
-                    "texto": dict(_TXT, description="trecho do nome, categoria, endereço ou bairro"),
+                    "whatsapp": {"type": "string", "enum": ["qualquer", "sim", "nao"],
+                                 "description": "sim = só com WhatsApp; nao = só sem; omita para qualquer"},
+                    "email": {"type": "string", "enum": ["qualquer", "sim", "nao"],
+                              "description": "sim = só com e-mail; nao = só sem; omita para qualquer"},
+                    "texto": dict(_TXT, description="trecho do nome, categoria, site, endereço ou bairro"),
                     "bairro": _TXT,
-                    "status": {"type": "string", "enum": ["", "interessado", "contatado", "visitar", "cliente",
-                                                          "sem_interesse"],
-                               "description": "'' = sem status"},
-                    "max_km": {"type": "number"}, "min_avaliacoes": {"type": "number"},
+                    "status": {"type": "string", "enum": ["qualquer", "sem_status", "interessado", "contatado",
+                                                          "visitar", "cliente", "sem_interesse"]},
+                    "max_km": {"type": "number", "description": "distância máxima; omita para não limitar"},
+                    "min_avaliacoes": {"type": "number", "description": "mínimo de avaliações no Google"},
                     "ordenar": {"type": "string", "enum": ["nota", "distancia", "avaliacoes"]},
-                    "limite": {"type": "integer", "description": "até 100, padrão 20"}, "pagina": {"type": "integer"}}},
+                    "limite": {"type": "integer", "description": "1 a 100, padrão 20"},
+                    "pagina": {"type": "integer", "description": "a partir de 1"}}},
     {"nome": "detalhar_prospect", "metodo": "detalhar_prospect",
      "descricao": "Ficha completa de um prospect: contatos, links de WhatsApp (com mensagem), rota, Waze, status.",
      "parametros": {"chave": _TXT, "busca_id": {"type": "integer"}}, "obrigatorios": ["chave"]},
