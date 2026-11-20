@@ -220,6 +220,15 @@ class Manipulador(BaseHTTPRequestHandler):
         if m:
             n = int(q.get("n") or 8)
             return self._enviar(200, app.planejar_rota(int(m.group(1)), quantidade=n, prioridade=q.get("prioridade")))
+        if caminho == "/api/chat/conversas":
+            return self._enviar(200, self.server.agente.listar())
+        m = re.fullmatch(r"/api/chat/conversas/([0-9a-f]{32})", caminho)
+        if m:
+            c = self.server.app.db.conversa_salva(0, m.group(1))
+            if not c:
+                return self._erro(404, "conversa não encontrada")
+            return self._enviar(200, {"id": c["id"], "titulo": c["titulo"], "busca_id": c["busca_id"],
+                                      "mensagens": c["mensagens"]})
         if caminho == "/api/chat/modelos":
             try:
                 return self._enviar(200, self.server.agente.modelos())
@@ -261,13 +270,18 @@ class Manipulador(BaseHTTPRequestHandler):
             t = urllib.parse.quote(srv.token)
             links = {k: f"/arquivos/{exp['busca_id']}/{Path(v).name}?t={t}" for k, v in exp["arquivos"].items()}
             return self._enviar(200, {"pasta": exp["pasta"], "links": links})
+        m = re.fullmatch(r"/api/chat/conversas/([0-9a-f]{32})/apagar", caminho)
+        if m:
+            return self._enviar(200, {"apagada": srv.agente.apagar(m.group(1))})
         if caminho == "/api/chat":
             agente = srv.agente
-            conversa = agente.conversa(d.get("conversa_id"))
+            busca_id = d.get("busca_id") if isinstance(d.get("busca_id"), int) else None
+            cid = d.get("conversa_id") if re.fullmatch(r"[0-9a-f]{32}", str(d.get("conversa_id") or "")) else None
+            conversa = agente.conversa(cid, busca_id=busca_id)
             texto = (d.get("mensagem") or "").strip()
             if not texto:
                 raise ErroFerramenta("mensagem vazia")
-            r = agente.enviar(conversa, texto, d.get("modelo"), busca_aberta=d.get("busca_id"))
+            r = agente.enviar(conversa, texto, d.get("modelo"), busca_aberta=busca_id)
             return self._enviar(200, dict(r, conversa_id=conversa.id))
         if caminho == "/api/chat/boas-vindas":
             srv.auth.marcar_boas_vindas()

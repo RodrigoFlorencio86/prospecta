@@ -189,6 +189,37 @@ class ChatTest(BaseOpenAI):
         self.assertIn(f"busca_id={bid}", self.oa.pedidos_responses[0]["instructions"])
         self.assertRegex(r["resposta"], r"Achei \d+ prospects A")
 
+    def test_conversas_ficam_salvas_e_presas_a_busca(self):
+        bid = self.app.db.busca(0)["id"]
+        c = self.agente.conversa()
+        r = self.agente.enviar(c, "quais os melhores?", "gpt-teste", busca_aberta=bid)
+        self.assertEqual(r["conversa"], {"id": c.id, "titulo": "quais os melhores?", "busca_id": bid})
+        # outra busca aberta na tela não muda o assunto de uma conversa que já tem busca
+        tid = self.app.iniciar_busca("Rua B", raio_km=1, perfil="ti")["tarefa_id"]
+        outra = esperar_tarefa(self.app, tid)["busca_id"]
+        self.agente.enviar(c, "e os de WhatsApp?", "gpt-teste", busca_aberta=outra)
+        self.assertEqual(c.busca_id, bid)
+        # o painel reiniciou: a conversa volta do banco, com histórico e mensagens
+        novo = chat.AgenteChat(self.app, self.auth, chat.ClienteResponses(self.oa.url + "/v1"))
+        lista = novo.listar()
+        self.assertEqual(len(lista), 1)
+        self.assertEqual((lista[0]["id"], lista[0]["titulo"], lista[0]["busca_id"], lista[0]["mensagens"]),
+                         (c.id, "quais os melhores?", bid, len(c.mensagens)))
+        self.assertRegex(lista[0]["busca"], r"· 8 empresas$")
+        volta = novo.conversa(c.id)
+        self.assertEqual([m["tipo"] for m in volta.mensagens][:4], ["eu", "acao", "ia", "eu"])
+        self.assertEqual(volta.mensagens, c.mensagens)
+        self.assertEqual(volta.historico, c.historico)
+        novo.enviar(volta, "e agora?", "gpt-teste")
+        self.assertEqual(self.oa.pedidos_responses[-2]["input"][0], {"role": "user", "content": "quais os melhores?"})
+        self.assertIn(f"busca_id={bid}", self.oa.pedidos_responses[-1]["instructions"])
+        # conversa geral adota a busca aberta na primeira pergunta; id desconhecido vira conversa nova
+        g = novo.conversa("f" * 32)
+        self.assertNotEqual(g.id, "f" * 32)
+        self.assertTrue(novo.apagar(c.id))
+        self.assertEqual(novo.listar(), [])
+        self.assertFalse(novo.apagar(c.id))
+
     def test_limite_de_uso(self):
         self.oa.limite = True
         c = self.agente.conversa()
@@ -412,8 +443,23 @@ class PainelTest(BaseOpenAI):
         st, r = self.api("/api/chat", {"mensagem": "quais os melhores?", "modelo": ms[0]["slug"]})
         self.assertEqual(st, 200, r)
         self.assertIn("Achei", r["resposta"])
+        cid = r["conversa_id"]
+        self.assertEqual(r["conversa"]["busca_id"], None)  # nada aberto na tela: conversa geral
+        st, lista = self.api("/api/chat/conversas")
+        self.assertEqual([(x["id"], x["titulo"]) for x in lista], [(cid, "quais os melhores?")])
+        st, conv = self.api(f"/api/chat/conversas/{cid}")
+        self.assertEqual([m["tipo"] for m in conv["mensagens"]], ["eu", "acao", "ia"])
+        bid = self.api("/api/estado")[1]["buscas"][0]["busca_id"]
+        st, r2 = self.api("/api/chat", {"mensagem": "e os de WhatsApp?", "modelo": "gpt-teste", "busca_id": bid})
+        self.assertEqual(r2["conversa"]["busca_id"], bid)
+        self.assertEqual(self.api("/api/chat", {"mensagem": "x", "busca_id": "1; drop"})[0], 400)
+        self.assertEqual(self.api("/api/chat/conversas/../../x")[0], 404)
+        self.assertEqual(self.api(f"/api/chat/conversas/{'0' * 32}")[0], 404)
+        st, _ = self.api(f"/api/chat/conversas/{r2['conversa_id']}/apagar", {})
+        self.assertEqual(st, 200)
+        self.assertEqual(len(self.api("/api/chat/conversas")[1]), 1)
         self.oa.limite = True
-        st, r = self.api("/api/chat", {"conversa_id": r["conversa_id"], "mensagem": "mais", "modelo": "gpt-teste"})
+        st, r = self.api("/api/chat", {"conversa_id": cid, "mensagem": "mais", "modelo": "gpt-teste"})
         self.assertEqual((st, r["tipo"], r["gerenciar_uso"]), (400, "limite", "https://chatgpt.com/settings/usage"))
         st, r = self.api("/auth/sair", {})
         self.assertEqual(self.oa.revogados[-1]["client_id"], "oaiapp_teste123")

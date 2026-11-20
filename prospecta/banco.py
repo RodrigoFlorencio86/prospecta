@@ -54,6 +54,20 @@ CREATE TABLE IF NOT EXISTS tarefas (
     dono TEXT DEFAULT ''
 );
 """
+CONVERSAS = """
+CREATE TABLE IF NOT EXISTS conversas (
+    id TEXT PRIMARY KEY,
+    chat_id INTEGER NOT NULL,
+    criada REAL NOT NULL,
+    atualizada REAL NOT NULL,
+    titulo TEXT DEFAULT '',
+    busca_id INTEGER,
+    modelo TEXT DEFAULT '',
+    historico TEXT NOT NULL,
+    mensagens TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS conversas_chat ON conversas(chat_id, atualizada);
+"""
 FINAIS = ("ok", "erro", "cancelada")
 
 STATUS = {"interessado": "⭐ Interessado", "contatado": "📨 Contatado", "visitar": "📍 Visitar",
@@ -74,6 +88,7 @@ class Banco:
         self.trava = threading.Lock()
         with self.trava, self.con:
             self.con.executescript(ESQUEMA)
+            self.con.executescript(CONVERSAS)
 
     def fechar(self):
         with self.trava:
@@ -263,3 +278,34 @@ class Banco:
             r = self.con.execute("SELECT id FROM tarefas WHERE dono=? AND estado='fila' ORDER BY id LIMIT 1",
                                  (dono,)).fetchone()
         return r[0] if r else None
+
+    # ── conversas do chat do painel ──
+    def salvar_conversa(self, chat_id, c):
+        with self.trava, self.con:
+            self.con.execute(
+                "INSERT INTO conversas (id, chat_id, criada, atualizada, titulo, busca_id, modelo, historico, mensagens) "
+                "VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET atualizada=excluded.atualizada, "
+                "titulo=excluded.titulo, busca_id=excluded.busca_id, modelo=excluded.modelo, "
+                "historico=excluded.historico, mensagens=excluded.mensagens",
+                (c["id"], chat_id, c["criada"], time.time(), c.get("titulo", ""), c.get("busca_id"), c.get("modelo", ""),
+                 json.dumps(c["historico"], ensure_ascii=False), json.dumps(c["mensagens"], ensure_ascii=False)))
+
+    def conversa_salva(self, chat_id, cid):
+        with self.trava:
+            r = self.con.execute("SELECT * FROM conversas WHERE chat_id=? AND id=?", (chat_id, cid)).fetchone()
+        if not r:
+            return None
+        d = dict(r)
+        d["historico"], d["mensagens"] = json.loads(d["historico"]), json.loads(d["mensagens"])
+        return d
+
+    def conversas_salvas(self, chat_id, limite=50):
+        with self.trava:
+            rs = self.con.execute("SELECT id, criada, atualizada, titulo, busca_id, modelo, "
+                                  "json_array_length(mensagens) AS n FROM conversas WHERE chat_id=? "
+                                  "ORDER BY atualizada DESC LIMIT ?", (chat_id, int(limite))).fetchall()
+        return [dict(r) for r in rs]
+
+    def apagar_conversa(self, chat_id, cid):
+        with self.trava, self.con:
+            return self.con.execute("DELETE FROM conversas WHERE chat_id=? AND id=?", (chat_id, cid)).rowcount > 0

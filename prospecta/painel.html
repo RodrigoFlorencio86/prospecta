@@ -77,6 +77,10 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 .acao { align-self:flex-start; font-size:.78rem; color:var(--suave); border:1px dashed var(--linha); border-radius:8px; padding:3px 8px; }
 #entrada { display:flex; gap:8px; margin-top:8px; }
 #entrada textarea { min-height:44px; max-height:140px; }
+.conv-barra { display:flex; gap:8px; margin-top:8px; }
+.conv-barra select { flex:1; min-width:0; }
+.sobre { margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--azul-claro); font-size:.85rem; line-height:1.35; }
+.sobre b { font-weight:650; }
 .plano { display:flex; align-items:center; gap:8px; font-size:.8rem; color:var(--suave); margin:6px 0; }
 .btn-chatgpt { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; background:var(--preto); color:var(--cartao); border:none; border-radius:999px; padding:11px 16px; font-weight:600; }
 .limite { border:1px solid var(--linha); border-radius:10px; padding:10px; margin:6px 0; }
@@ -208,8 +212,13 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
       <div id="chat-dentro" class="oculto" style="display:flex; flex-direction:column; flex:1; min-height:0">
         <div class="linha2">
           <select id="modelo" title="Modelo"></select>
-          <button class="peq" id="btn-nova">Nova conversa</button>
+          <button class="peq" id="btn-nova">＋ Nova conversa</button>
         </div>
+        <div class="conv-barra">
+          <select id="conversas" title="Conversas anteriores"></select>
+          <button class="peq" id="btn-apagar-conv" title="Apagar esta conversa">🗑️</button>
+        </div>
+        <div class="sobre" id="sobre"></div>
         <div class="plano">Usando seu plano do ChatGPT · <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener">Gerenciar uso</a></div>
         <div id="msgs"></div>
         <form id="entrada">
@@ -234,7 +243,8 @@ const COR = {A: "#1e8e3e", B: "#d39200", C: "#98a3ae"};
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const url = u => /^https?:\/\//.test(u || "") ? u : "";
-let E = null, BUSCA = null, mapa = null, camada = null, conversa = null, vigia = null, ultimasOk = new Set();
+let E = null, BUSCA = null, mapa = null, camada = null, vigia = null, ultimasOk = new Set();
+let CONV = null, CONVS = [];  // conversa aberta no chat e lista de conversas salvas
 
 async function api(caminho, corpo) {
   const op = {headers: {"X-Prospecta": TOKEN}};
@@ -328,7 +338,7 @@ async function vigiar(agora) {
       desenharTarefas(E.tarefas);
       const novas = E.tarefas.filter(t => t.estado === "ok" && !ultimasOk.has(t.tarefa_id));
       novas.forEach(t => ultimasOk.add(t.tarefa_id));
-      if (novas.length) { aviso("✅ Busca concluída: " + novas[0].mensagem, 7000); await carregar(); abrirBusca(novas[0].busca_id); return; }
+      if (novas.length) { aviso("✅ Busca concluída: " + novas[0].mensagem, 7000); await carregar(); abrirBusca(novas[0].busca_id, "auto"); return; }
     } catch (e) {}
     vigiar(ativos());
   }, agora ? 300 : 3000);
@@ -343,7 +353,7 @@ function desenharHist() {
 }
 $("#hist").addEventListener("click", ev => { const li = ev.target.closest("li[data-id]"); if (li) abrirBusca(+li.dataset.id); });
 
-async function abrirBusca(id) {
+async function abrirBusca(id, origem) {
   try { BUSCA = await api(`/api/buscas/${id}`); } catch (e) { aviso(e.message); return; }
   $("#res-vazio").classList.add("oculto"); $("#res-cheio").classList.remove("oculto");
   $("#rota").classList.add("oculto"); $("#links-exp").textContent = "";
@@ -357,6 +367,7 @@ async function abrirBusca(id) {
   const fs = $("#f-s");
   if (fs.options.length <= 2) Object.entries(STATUS).slice(1).forEach(([v, t]) => fs.add(new Option(t, v)));
   desenharHist(); desenharMapa(); desenharLista();
+  sincronizarChat(BUSCA.busca_id, origem);
 }
 function desenharMapa() {
   if (!window.L) { $("#mapa").classList.add("oculto"); return; }
@@ -443,7 +454,7 @@ function desenharConta() {
     ? `ChatGPT: ${esc(c.email || "conectado")} · <a href="#" id="lnk-outra">usar outra conta</a> · <a href="#" id="lnk-sair">sair</a>` : "";
   if ($("#lnk-sair")) $("#lnk-sair").onclick = ev => { ev.preventDefault(); sair(); };
   if ($("#lnk-outra")) $("#lnk-outra").onclick = ev => { ev.preventDefault(); location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}&nova=1`; };
-  if (dentro && !$("#modelo").options.length) carregarModelos();
+  if (dentro && !$("#modelo").options.length) { carregarModelos(); carregarConversas(); }
   if (dentro && !c.boas_vindas_vista) modal(`<h2>Você está usando seu plano do ChatGPT</h2>
     <p>Os pedidos do assistente do Prospecta usam o seu plano do ChatGPT. Você acompanha e limita esse uso nas configurações do ChatGPT.</p>
     <p><a href="${esc(E.gerenciar_uso)}" target="_blank" rel="noopener">Gerenciar uso</a></p><button class="prim" id="ok-boas">Entendi</button>`,
@@ -452,7 +463,7 @@ function desenharConta() {
 $("#btn-entrar").onclick = () => location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}`;
 $("#btn-consentir").onclick = () => location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}&consentir=1`;
 $("#btn-sair2").onclick = () => sair();
-async function sair() { try { const r = await api("/auth/sair", {}); if (r.aviso) aviso(r.aviso, 8000); } catch (e) {} conversa = null; $("#msgs").innerHTML = ""; $("#modelo").innerHTML = ""; carregar(); }
+async function sair() { try { const r = await api("/auth/sair", {}); if (r.aviso) aviso(r.aviso, 8000); } catch (e) {} CONV = null; CONVS = []; $("#msgs").innerHTML = ""; $("#modelo").innerHTML = ""; carregar(); }
 async function carregarModelos() {
   try {
     const ms = await api("/api/chat/modelos");
@@ -466,7 +477,60 @@ $("#modelo").addEventListener("change", () => localStorageSet("modelo", $("#mode
 function localStorageGet(k) { try { return localStorage.getItem("prospecta:" + k); } catch (e) { return null; } }
 function localStorageSet(k, v) { try { localStorage.setItem("prospecta:" + k, v); } catch (e) {} }
 function bolha(tipo, texto) { const d = document.createElement("div"); d.className = "msg " + tipo; d.textContent = texto; $("#msgs").appendChild(d); $("#msgs").scrollTop = 1e9; return d; }
-$("#btn-nova").onclick = () => { conversa = null; $("#msgs").innerHTML = ""; };
+function acaoChip(texto) { const d = document.createElement("div"); d.className = "acao"; d.textContent = texto; $("#msgs").appendChild(d); }
+function buscaPorId(id) { return E && id ? E.buscas.find(b => b.busca_id === id) : null; }
+function curto(local) { return String(local || "").split(",").slice(0, 2).join(",").trim(); }
+function convNova(buscaId) { CONV = {id: null, titulo: "", busca_id: buscaId || null, mensagens: []}; desenharConversa(); }
+function desenharConversa() {
+  $("#msgs").innerHTML = "";
+  (CONV ? CONV.mensagens : []).forEach(m => m.tipo === "acao" ? acaoChip(m.texto) : bolha(m.tipo, m.texto));
+  atualizarSobre(); desenharListaConv();
+}
+function atualizarSobre() {
+  const b = CONV && buscaPorId(CONV.busca_id);
+  $("#sobre").innerHTML = b
+    ? `💬 Conversando sobre a busca <b>${esc(b.servico)}</b> · ${esc(b.total)} empresas · até ${esc(String(b.raio_km).replace(".", ","))} km de ${esc(curto(b.local))}`
+    : CONV && CONV.busca_id ? `💬 Conversando sobre a busca nº ${esc(CONV.busca_id)}${(c => c && c.busca ? " (" + esc(c.busca) + ")" : "")(CONVS.find(c => c.id === CONV.id))}.`
+    : "💬 Conversa geral. Peça uma busca nova, ou abra uma busca à esquerda para conversar sobre ela.";
+}
+function desenharListaConv() {
+  const sel = $("#conversas");
+  const opcoes = [`<option value="">${CONVS.length ? `Conversas anteriores (${CONVS.length})` : "Nenhuma conversa salva ainda"}</option>`]
+    .concat(CONVS.map(c => `<option value="${esc(c.id)}">${esc(c.titulo)} · ${esc(c.busca || "geral")} · ${esc(c.atualizada)}</option>`));
+  sel.innerHTML = opcoes.join("");
+  sel.value = CONV && CONV.id && CONVS.some(c => c.id === CONV.id) ? CONV.id : "";
+  $("#btn-apagar-conv").disabled = !(CONV && CONV.id);
+}
+async function carregarConversas() {
+  try { CONVS = await api("/api/chat/conversas"); } catch (e) { CONVS = []; }
+  if (!CONV) { const s = BUSCA && CONVS.find(c => c.busca_id === BUSCA.busca_id); if (s) return abrirConversa(s.id); convNova(BUSCA ? BUSCA.busca_id : null); return; }
+  if (!CONV.id && !CONV.mensagens.length) { const s = CONVS.find(c => c.busca_id === CONV.busca_id); if (s) return abrirConversa(s.id); }
+  desenharListaConv();
+}
+async function abrirConversa(id) {
+  try { CONV = await api(`/api/chat/conversas/${id}`); } catch (e) { aviso("⚠️ " + e.message); return; }
+  desenharConversa();
+  const c = CONVS.find(x => x.id === CONV.id);
+  if (CONV.busca_id && (!BUSCA || BUSCA.busca_id !== CONV.busca_id) && !(c && c.busca === "busca apagada")) abrirBusca(CONV.busca_id);
+}
+// O chat sempre mostra a conversa da busca que está na tela.
+function sincronizarChat(buscaId, origem) {
+  if (!E || !E.conta || !E.conta.plano || E.conta.desconectada) return;
+  if (!CONV) return;  // a lista de conversas ainda está carregando; carregarConversas decide
+  if (CONV.busca_id === buscaId) return atualizarSobre();
+  const s = CONVS.find(c => c.busca_id === buscaId);
+  if (!CONV.id && !CONV.mensagens.length) { if (s) abrirConversa(s.id); else { CONV.busca_id = buscaId; atualizarSobre(); } return; }
+  if (!CONV.busca_id && origem === "auto") { CONV.busca_id = buscaId; atualizarSobre(); return; }  // a busca pedida no chat terminou
+  if (s) abrirConversa(s.id); else convNova(buscaId);
+  aviso("O chat agora mostra a conversa desta busca.", 3500);
+}
+$("#btn-nova").onclick = () => { convNova(BUSCA ? BUSCA.busca_id : null); $("#texto").focus(); };
+$("#conversas").addEventListener("change", ev => { if (ev.target.value) abrirConversa(ev.target.value); });
+$("#btn-apagar-conv").onclick = async () => {
+  if (!CONV || !CONV.id || !confirm(`Apagar a conversa "${CONV.titulo}"?`)) return;
+  try { await api(`/api/chat/conversas/${CONV.id}/apagar`, {}); } catch (e) { aviso("⚠️ " + e.message); return; }
+  CONV = null; await carregarConversas(); aviso("Conversa apagada.");
+};
 $("#texto").addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("#entrada").requestSubmit(); } });
 $("#entrada").addEventListener("submit", async ev => {
   ev.preventDefault();
@@ -474,11 +538,14 @@ $("#entrada").addEventListener("submit", async ev => {
   $("#texto").value = ""; bolha("eu", texto);
   const espera = bolha("ia", "pensando…"); $("#btn-enviar").disabled = true;
   try {
-    const r = await api("/api/chat", {conversa_id: conversa, mensagem: texto, modelo: $("#modelo").value,
-                                       busca_id: BUSCA ? BUSCA.busca_id : null});
-    conversa = r.conversa_id; espera.remove();
-    r.acoes.forEach(a => { const d = document.createElement("div"); d.className = "acao"; d.textContent = a.resumo; $("#msgs").appendChild(d); });
+    if (!CONV) convNova(BUSCA ? BUSCA.busca_id : null);
+    const r = await api("/api/chat", {conversa_id: CONV.id, mensagem: texto, modelo: $("#modelo").value, busca_id: CONV.busca_id});
+    espera.remove();
+    Object.assign(CONV, {id: r.conversa.id, titulo: r.conversa.titulo, busca_id: r.conversa.busca_id});
+    CONV.mensagens.push({tipo: "eu", texto}, ...r.acoes.map(a => ({tipo: "acao", texto: a.resumo})), {tipo: "ia", texto: r.resposta || "(sem resposta)"});
+    r.acoes.forEach(a => acaoChip(a.resumo));
     bolha("ia", r.resposta || "(sem resposta)");
+    carregarConversas(); atualizarSobre();
     if (r.atualizar) { await carregar(); if (BUSCA) abrirBusca(BUSCA.busca_id); vigiar(true); }
   } catch (e) {
     espera.remove();

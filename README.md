@@ -204,6 +204,9 @@ Abre `http://127.0.0.1:8765` no seu navegador, servido pelo seu próprio computa
   (Go, Plus, Pro ou Business), pelo recurso oficial "Sign in with ChatGPT" da OpenAI para apps de
   código aberto. Você acompanha e limita o uso em
   [ChatGPT → Configurações → Uso](https://chatgpt.com/settings/usage).
+- **Conversas salvas:** cada conversa fica ligada a uma busca, e o chat mostra sempre sobre qual
+  busca você está falando. Ao abrir uma busca, o chat abre a conversa dela; em **Conversas
+  anteriores** você retoma qualquer uma, mesmo depois de fechar o painel.
 
 ### 🤖 No app do Claude, no Claude Code ou no Codex
 
@@ -329,7 +332,8 @@ hora, escolhendo "Outro" e digitando o que procurar.
 
 ## 🔒 Privacidade, LGPD e uso responsável
 
-- **Seus dados ficam no seu computador:** buscas, resultados, status e anotações.
+- **Seus dados ficam no seu computador:** buscas, resultados, status, anotações e as conversas
+  com o assistente (apague qualquer uma pelo 🗑️ no chat).
 - **Login do ChatGPT:**
   - fica num arquivo que só o seu usuário lê;
   - o Prospecta nunca vê a sua senha e não acessa as suas conversas do ChatGPT;

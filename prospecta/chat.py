@@ -175,11 +175,26 @@ def _eventos_sse(resposta):
 
 
 class Conversa:
-    def __init__(self):
-        self.id = uuid.uuid4().hex
-        self.historico = []
+    """Uma conversa do chat: histórico completo para o modelo (historico) e a transcrição para mostrar na tela
+    (mensagens). Fica ligada a uma busca (busca_id) e salva no banco local."""
+
+    def __init__(self, busca_id=None, salva=None):
+        salva = salva or {}
+        self.id = salva.get("id") or uuid.uuid4().hex
+        self.historico = salva.get("historico") or []
+        self.mensagens = salva.get("mensagens") or []
+        self.titulo = salva.get("titulo") or ""
+        self.modelo = salva.get("modelo") or ""
+        self.busca_id = salva.get("busca_id") if salva else (int(busca_id) if busca_id else None)
+        self.criada = salva.get("criada") or time.time()
         self.trava = threading.Lock()
-        self.criada = time.time()
+
+    def como_dict(self):
+        return {"id": self.id, "historico": self.historico, "mensagens": self.mensagens, "titulo": self.titulo,
+                "modelo": self.modelo, "busca_id": self.busca_id, "criada": self.criada}
+
+    def publica(self):
+        return {"id": self.id, "titulo": self.titulo, "busca_id": self.busca_id, "mensagens": self.mensagens}
 
 
 class AgenteChat:
@@ -189,13 +204,31 @@ class AgenteChat:
         self.cliente = cliente or ClienteResponses()
         self.conversas = {}
 
-    def conversa(self, cid=None):
+    def conversa(self, cid=None, busca_id=None):
+        """A conversa pedida (da memória ou do banco) ou uma nova, ligada à busca informada."""
         if cid and cid in self.conversas:
             return self.conversas[cid]
-        c = Conversa()
-        self.conversas = {k: v for k, v in self.conversas.items() if time.time() - v.criada < 86400}
+        salva = self.app.db.conversa_salva(0, cid) if cid else None
+        c = Conversa(busca_id=busca_id, salva=salva)
+        if len(self.conversas) > 50:
+            self.conversas = dict(list(self.conversas.items())[-25:])
         self.conversas[c.id] = c
         return c
+
+    def listar(self, limite=50):
+        nomes = {b["busca_id"]: b for b in self.app.listar_buscas(200)}
+        saida = []
+        for c in self.app.db.conversas_salvas(0, limite):
+            b = nomes.get(c["busca_id"])
+            saida.append({"id": c["id"], "titulo": c["titulo"] or "Conversa", "busca_id": c["busca_id"],
+                          "busca": f"{b['servico']} · {b['total']} empresas" if b else ("" if not c["busca_id"] else "busca apagada"),
+                          "atualizada": time.strftime("%d/%m %H:%M", time.localtime(c["atualizada"])),
+                          "mensagens": c["n"]})
+        return saida
+
+    def apagar(self, cid):
+        self.conversas.pop(cid, None)
+        return self.app.db.apagar_conversa(0, cid)
 
     def modelos(self):
         try:
@@ -204,49 +237,62 @@ class AgenteChat:
             raise ErroChat(str(ex), "sessao") from ex
 
     def enviar(self, conversa, texto, modelo, busca_aberta=None):
-        """Uma mensagem do usuário -> {"resposta", "acoes", "atualizar"}."""
+        """Uma mensagem do usuário -> {"resposta", "acoes", "atualizar", "conversa"}. A conversa fica ligada à sua
+        busca; uma conversa ainda sem busca adota a que está aberta. Depois de cada resposta, é salva."""
         if not modelo:
             raise ErroChat("Escolha um modelo.", "modelo")
         with conversa.trava:
-            conversa.historico.append({"role": "user", "content": texto[:8000]})
-            acoes, atualizar = [], False
-            for _ in range(MAX_RODADAS):
+            if not conversa.busca_id and busca_aberta:
+                conversa.busca_id = int(busca_aberta)
+            r = self._enviar(conversa, texto, modelo, conversa.busca_id)
+            conversa.modelo = modelo
+            conversa.titulo = conversa.titulo or " ".join(texto.split())[:60]
+            conversa.mensagens.append({"tipo": "eu", "texto": texto[:8000]})
+            conversa.mensagens.extend({"tipo": "acao", "texto": a["resumo"]} for a in r["acoes"])
+            conversa.mensagens.append({"tipo": "ia", "texto": r["resposta"]})
+            self.app.db.salvar_conversa(0, conversa.como_dict())
+            return dict(r, conversa={"id": conversa.id, "titulo": conversa.titulo, "busca_id": conversa.busca_id})
+
+    def _enviar(self, conversa, texto, modelo, busca_aberta):
+        conversa.historico.append({"role": "user", "content": texto[:8000]})
+        acoes, atualizar = [], False
+        for _ in range(MAX_RODADAS):
+            try:
+                token = self.auth.token_valido()
+            except ErroLogin as ex:
+                self._desfazer(conversa)
+                raise ErroChat(str(ex), "sessao") from ex
+            corpo = {"model": modelo, "instructions": instrucoes(self.app.configuracao(), self._busca_info(busca_aberta)),
+                     "input": conversa.historico, "tools": namespace_ferramentas(), "store": False, "stream": True}
+            try:
+                resp = self.cliente.responder(token, corpo)
+            except ErroChat:
+                self._desfazer(conversa)
+                raise
+            saida = [i for i in resp.get("output") or [] if isinstance(i, dict)]
+            conversa.historico.extend(saida)
+            chamadas = [i for i in saida if i.get("type") == "function_call"]
+            if not chamadas:
+                texto_final = _texto(saida) or ("(a resposta veio incompleta)" if resp.get("_incompleta") else "")
+                self._aparar(conversa)
+                return {"resposta": texto_final, "acoes": acoes, "atualizar": atualizar}
+            for ch in chamadas:
+                nome = ch.get("name", "")
                 try:
-                    token = self.auth.token_valido()
-                except ErroLogin as ex:
-                    self._desfazer(conversa)
-                    raise ErroChat(str(ex), "sessao") from ex
-                corpo = {"model": modelo, "instructions": instrucoes(self.app.configuracao(), self._busca_info(busca_aberta)),
-                         "input": conversa.historico, "tools": namespace_ferramentas(), "store": False, "stream": True}
-                try:
-                    resp = self.cliente.responder(token, corpo)
-                except ErroChat:
-                    self._desfazer(conversa)
-                    raise
-                saida = [i for i in resp.get("output") or [] if isinstance(i, dict)]
-                conversa.historico.extend(saida)
-                chamadas = [i for i in saida if i.get("type") == "function_call"]
-                if not chamadas:
-                    texto_final = _texto(saida) or ("(a resposta veio incompleta)" if resp.get("_incompleta") else "")
-                    self._aparar(conversa)
-                    return {"resposta": texto_final, "acoes": acoes, "atualizar": atualizar}
-                for ch in chamadas:
-                    nome = ch.get("name", "")
-                    try:
-                        args = json.loads(ch.get("arguments") or "{}")
-                    except ValueError:
-                        args = None
-                    if busca_aberta and isinstance(args, dict) and nome in COM_BUSCA and not args.get("busca_id"):
-                        args["busca_id"] = int(busca_aberta)  # "essa busca" = a que está na tela
-                    resultado, erro = chamar(self.app, nome, args)
-                    saida_txt = _caber(resultado)
-                    conversa.historico.append({"type": "function_call_output", "call_id": ch.get("call_id"),
-                                               "output": saida_txt})
-                    acoes.append({"ferramenta": nome, "erro": erro, "resumo": _resumo_acao(nome, args, resultado, erro)})
-                    atualizar = atualizar or (nome in FERRAMENTAS_QUE_MUDAM and not erro)
-            self._aparar(conversa)
-            return {"resposta": "Parei aqui para não gastar demais seu plano. Quer que eu continue?",
-                    "acoes": acoes, "atualizar": atualizar}
+                    args = json.loads(ch.get("arguments") or "{}")
+                except ValueError:
+                    args = None
+                if busca_aberta and isinstance(args, dict) and nome in COM_BUSCA and not args.get("busca_id"):
+                    args["busca_id"] = int(busca_aberta)  # "essa busca" = a que está na tela
+                resultado, erro = chamar(self.app, nome, args)
+                saida_txt = _caber(resultado)
+                conversa.historico.append({"type": "function_call_output", "call_id": ch.get("call_id"),
+                                           "output": saida_txt})
+                acoes.append({"ferramenta": nome, "erro": erro, "resumo": _resumo_acao(nome, args, resultado, erro)})
+                atualizar = atualizar or (nome in FERRAMENTAS_QUE_MUDAM and not erro)
+        self._aparar(conversa)
+        return {"resposta": "Parei aqui para não gastar demais seu plano. Quer que eu continue?",
+                "acoes": acoes, "atualizar": atualizar}
 
     def _busca_info(self, busca_id):
         if not busca_id:
