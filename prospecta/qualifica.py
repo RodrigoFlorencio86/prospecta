@@ -6,6 +6,7 @@
   sinais       até 20  palavras do perfil nas avaliações (ex.: "freezer", "calor", "barata")
 """
 import json
+import re
 import math
 
 
@@ -40,7 +41,13 @@ def sinais_em(avaliacoes_json, palavras):
     except ValueError:
         return []
     texto = " ".join(str(r.get("Description", "")) for r in revs if isinstance(r, dict)).lower()
-    return [p for p in palavras if p in texto]
+    achadas = []
+    for p in palavras:
+        # mostra a palavra como está na avaliação ("gelad" -> "geladeira"), sem repetir
+        m = re.search(r"\w*" + re.escape(p) + r"\w*", texto)
+        if m and m.group(0) not in achadas:
+            achadas.append(m.group(0))
+    return achadas
 
 
 def nota(p, raio_m):

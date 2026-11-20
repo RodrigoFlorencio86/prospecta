@@ -314,7 +314,8 @@ def _resumo_acao(nome, args, resultado, erro):
     if nome == "iniciar_busca":
         return f"🔎 Busca iniciada: {r.get('local', '')[:50]} · ~{r.get('estimativa_min')} min"
     if nome == "consultar_prospects":
-        filtros = ", ".join(f"{k}: {v}" for k, v in (r.get("filtros_aplicados") or {}).items())
+        legivel = lambda v: "sim" if v is True else "não" if v is False else v  # noqa: E731
+        filtros = ", ".join(f"{k}: {legivel(v)}" for k, v in (r.get("filtros_aplicados") or {}).items())
         return (f"📋 {r.get('total_filtrado')} de {r.get('total_na_busca')} empresas"
                 + (f" ({filtros})" if filtros else " (sem filtros)")
                 + (f", página {r.get('pagina')} de {r.get('paginas')}" if (r.get("paginas") or 1) > 1 else ""))

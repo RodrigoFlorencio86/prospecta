@@ -118,7 +118,9 @@ class RotasTest(unittest.TestCase):
 class QualificaTest(unittest.TestCase):
     def test_sinais(self):
         revs = '[{"Description": "O FREEZER estava quente e o sorvete derretido"}]'
-        self.assertEqual(qualifica.sinais_em(revs, ["freezer", "derretid", "barata"]), ["freezer", "derretid"])
+        self.assertEqual(qualifica.sinais_em(revs, ["freezer", "derretid", "barata"]), ["freezer", "derretido"])
+        revs = '[{"Description": "a geladeira não gelava"}]'
+        self.assertEqual(qualifica.sinais_em(revs, ["geladeira", "gelad"]), ["geladeira"])
         self.assertEqual(qualifica.sinais_em("lixo", ["freezer"]), [])
 
     def test_prioridade(self):
