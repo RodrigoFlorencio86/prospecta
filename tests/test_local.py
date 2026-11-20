@@ -59,6 +59,24 @@ class RelatorioTest(unittest.TestCase):
         self.assertEqual(item["site"], "")  # javascript: nunca vira link
 
 
+class MapaTest(unittest.TestCase):
+    """O OpenStreetMap recusa (403) imagens de mapa pedidas sem Referer: as do painel e do relatório
+    precisam informar a origem, mesmo com a página em "no-referrer"."""
+
+    def test_painel_envia_origem_nas_imagens_do_mapa(self):
+        html = (Path(relatorio.__file__).with_name("painel.html")).read_text(encoding="utf-8")
+        self.assertIn('referrerPolicy: "strict-origin-when-cross-origin"', html)
+        self.assertIn("https://tile.openstreetmap.org/{z}/{x}/{y}.png", html)
+
+    def test_relatorio_sem_mapa_de_ruas_quando_aberto_do_arquivo(self):
+        ps = busca.juntar([linha("X", *geo.deslocar(CENTRO.lat, CENTRO.lon, 100, 0))], CENTRO, 1000)
+        caminho = relatorio.gerar(Path(tempfile.mkdtemp()) / "r.html", ps, CENTRO, perfis.carregar()["ti"], 1000)
+        html = caminho.read_text(encoding="utf-8")
+        self.assertIn("location.protocol === 'file:'", html)
+        self.assertIn("referrerPolicy:'strict-origin-when-cross-origin'", html)
+        self.assertIn('id="mapa-aviso"', html)
+
+
 class CLITest(unittest.TestCase):
     """buscar de ponta a ponta contra um motor HTTP falso, sem internet."""
 

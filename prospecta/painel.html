@@ -362,7 +362,10 @@ function desenharMapa() {
   if (!window.L) { $("#mapa").classList.add("oculto"); return; }
   if (!mapa) {
     mapa = L.map("mapa");
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "© OpenStreetMap"}).addTo(mapa);
+    // O OpenStreetMap recusa (403) imagens pedidas sem Referer; a página usa "no-referrer" por segurança, então
+    // só as imagens do mapa informam a origem do painel (http://127.0.0.1:porta), nunca o caminho nem o token.
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      referrerPolicy: "strict-origin-when-cross-origin"}).addTo(mapa);
   }
   if (camada) camada.remove();
   camada = L.layerGroup().addTo(mapa);

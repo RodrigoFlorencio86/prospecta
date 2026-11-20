@@ -23,6 +23,7 @@ h1 { font-size:1.35rem; margin:0 0 4px; }
 .kpi { background:var(--cartao); border:1px solid var(--linha); border-radius:10px; padding:8px 12px; }
 .kpi b { font-size:1.15rem; display:block; }
 main { max-width:1100px; margin:auto; padding:0 16px 40px; }
+.aviso-mapa { background:var(--cartao); border:1px solid var(--linha); border-radius:10px; padding:10px 12px; margin:10px 0 0; font-size:.9rem; color:var(--suave); }
 #mapa { height:340px; border-radius:12px; border:1px solid var(--linha); margin:10px 0 14px; }
 .filtros { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0 12px; }
 .filtros input, .filtros select { padding:8px 10px; border-radius:8px; border:1px solid var(--linha); background:var(--cartao); color:var(--texto); font:inherit; }
@@ -49,6 +50,10 @@ footer { color:var(--suave); font-size:.85rem; max-width:1100px; margin:auto; pa
   <div class="kpis" id="kpis"></div>
 </header>
 <main>
+  <div id="mapa-aviso" class="aviso-mapa" style="display:none">🗺️ Os pontos abaixo estão sem o mapa de ruas
+    porque este arquivo foi aberto direto do computador. Para ver as ruas, abra a busca no painel
+    (<code>python -m prospecta painel</code>, ou peça ao Claude "abra o painel") ou importe o arquivo
+    <code>prospects.kml</code> em <a href="https://www.google.com/maps/d/" target="_blank" rel="noopener">Google My Maps</a>.</div>
   <div id="mapa"></div>
   <div class="rota" id="rota"></div>
   <div class="filtros">
@@ -84,7 +89,14 @@ const cor = {A:'#1e8e3e', B:'#e3a008', C:'#9aa5b1'};
 let mapa = null;
 if (window.L) {
   mapa = L.map('mapa').setView([D.base.lat, D.base.lon], 14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap'}).addTo(mapa);
+  if (location.protocol === 'file:') {
+    // Aberto direto do arquivo, o navegador não tem origem para informar e o OpenStreetMap recusa as imagens do
+    // mapa (403). Mostramos só os pontos, sobre fundo neutro, e explicamos como ver o mapa de ruas.
+    document.getElementById('mapa-aviso').style.display = 'block';
+  } else {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      referrerPolicy:'strict-origin-when-cross-origin'}).addTo(mapa);
+  }
   L.circle([D.base.lat, D.base.lon], {radius:D.raio_m, color:'#1f5fbf', weight:1, fillOpacity:.04}).addTo(mapa);
   L.circleMarker([D.base.lat, D.base.lon], {radius:8, color:'#1f5fbf', fillOpacity:1}).addTo(mapa).bindPopup('Base');
   D.itens.forEach((p, i) => L.circleMarker([p.lat, p.lon], {radius:6, color:cor[p.prioridade], fillOpacity:.85})

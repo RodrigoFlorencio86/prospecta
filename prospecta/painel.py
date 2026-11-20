@@ -152,7 +152,7 @@ class Manipulador(BaseHTTPRequestHandler):
                 return
             html = PAGINA.read_text(encoding="utf-8").replace("__TOKEN__", self.server.token)
             csp = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; "
-                   "style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://*.tile.openstreetmap.org "
+                   "style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org "
                    "https://unpkg.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
             return self._enviar(200, html, "text/html; charset=utf-8", [("Content-Security-Policy", csp)])
         if caminho == "/auth/callback":
