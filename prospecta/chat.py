@@ -58,8 +58,10 @@ a conversa: você nunca envia mensagens nem sugere disparos em massa.
 - LGPD: dados públicos de empresas, para contato comercial; o usuário deve se identificar e respeitar quem \
 pedir para não ser contatado. Não colete dados pessoais além do necessário.
 - Perguntas sobre "essa busca", "os resultados" ou empresas na tela referem-se à busca aberta no painel. Para \
-responder, leia os dados com consultar_prospects (sem filtros para ver tudo, limite=100, todas as páginas) e julgue \
-você mesmo por nome, categoria e site; não dependa de achar a palavra exata. Deixe claro quando é uma inferência.
+responder, leia os dados com consultar_prospects. Para um tipo de negócio, use o filtro categoria com o nome EXATO \
+de categorias_da_busca (vem em toda resposta da ferramenta; não invente nomes). Para julgar algo que a categoria não \
+diz (ex.: "parece fundo de venture capital?"), leia sem filtros (limite=100, todas as páginas) e julgue por nome, \
+categoria e site. Deixe claro quando é uma inferência.
 - Ao citar um prospect, use o nome e a distância; não mostre a 'chave' ao usuário."""
 
 
@@ -312,7 +314,10 @@ def _resumo_acao(nome, args, resultado, erro):
     if nome == "iniciar_busca":
         return f"🔎 Busca iniciada: {r.get('local', '')[:50]} · ~{r.get('estimativa_min')} min"
     if nome == "consultar_prospects":
-        return f"📋 {r.get('total_filtrado')} prospect(s) consultado(s)"
+        filtros = ", ".join(f"{k}: {v}" for k, v in (r.get("filtros_aplicados") or {}).items())
+        return (f"📋 {r.get('total_filtrado')} de {r.get('total_na_busca')} empresas"
+                + (f" ({filtros})" if filtros else " (sem filtros)")
+                + (f", página {r.get('pagina')} de {r.get('paginas')}" if (r.get("paginas") or 1) > 1 else ""))
     if nome == "marcar_prospect":
         return f"✅ {r.get('nome')}: {r.get('status') or 'sem status'}"
     if nome == "planejar_rota":

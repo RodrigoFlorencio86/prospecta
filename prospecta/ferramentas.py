@@ -367,37 +367,44 @@ class Prospecta:
             rs = self.db.con.execute("SELECT chave, status, obs FROM prospects WHERE chat_id=?", (EU,)).fetchall()
         return {r["chave"]: (r["status"] or "", r["obs"] or "") for r in rs}
 
-    def consultar_prospects(self, busca_id=None, prioridade=None, whatsapp=None, email=None, texto=None,
-                            bairro=None, status=None, max_km=None, min_avaliacoes=None, ordenar="nota", limite=20,
-                            pagina=1, com_whatsapp=None, com_email=None):
+    def consultar_prospects(self, busca_id=None, categoria=None, prioridade=None, whatsapp=None, email=None,
+                            texto=None, bairro=None, status=None, max_km=None, min_avaliacoes=None, ordenar="nota",
+                            limite=20, pagina=1, com_whatsapp=None, com_email=None):
         """Filtros vazios não filtram: modelos costumam mandar todos os campos com "", 0 ou false."""
         b = self._busca(busca_id or None)
         st = self._status()
         whatsapp = _trinario(whatsapp if whatsapp is not None else com_whatsapp)
         email = _trinario(email if email is not None else com_email)
         prioridade = "".join(c for c in str(prioridade or "").upper() if c in "ABC") or None
-        texto = (texto or "").strip().lower() or None
-        bairro = (bairro or "").strip().lower() or None
+        texto = (texto or "").strip() or None
+        bairro = _norm(bairro) or None
+        if isinstance(categoria, (list, tuple)):
+            categorias = {_norm(c) for c in categoria if _norm(c)}
+        else:
+            categorias = {_norm(c) for c in re.split(r"[|;]", str(categoria or "")) if _norm(c)}
         status = None if status in (None, "", "qualquer", "todos") else ("" if status in ("sem_status", "nenhum") else status)
         max_km = _num(max_km) or None
         min_avaliacoes = _num(min_avaliacoes) or None
-        aplicados = {k: v for k, v in (("prioridade", prioridade), ("whatsapp", whatsapp), ("email", email),
+        aplicados = {k: v for k, v in (("categoria", categoria if categorias else None), ("prioridade", prioridade),
+                                       ("whatsapp", whatsapp), ("email", email),
                                        ("texto", texto), ("bairro", bairro), ("max_km", max_km),
                                        ("min_avaliacoes", min_avaliacoes)) if v is not None}
         if status is not None:
             aplicados["status"] = status or "sem_status"
 
         def ok(d, s):
+            if categorias and _norm(d.get("categoria")) not in categorias:
+                return False
             if prioridade and d["prioridade"] not in prioridade:
                 return False
             if whatsapp is not None and bool(d["whatsapp"]) != whatsapp:
                 return False
             if email is not None and bool(d["emails"]) != email:
                 return False
-            if texto and texto not in " ".join(str(d.get(k, "")) for k in
-                                               ("nome", "categoria", "alvo", "endereco", "bairro", "site")).lower():
+            if texto and not _casa_texto(texto, " ".join(str(d.get(k, "")) for k in
+                                                         ("nome", "categoria", "alvo", "endereco", "bairro", "site"))):
                 return False
-            if bairro and bairro not in (d.get("bairro") or "").lower():
+            if bairro and bairro not in _norm(d.get("bairro")):
                 return False
             if status is not None and s != status:
                 return False
@@ -420,10 +427,12 @@ class Prospecta:
         ini = (pagina - 1) * limite
         r = {"busca_id": b["id"], "servico": b["perfil"], "local": b["local"].get("descricao", ""),
              "total_na_busca": len(b["itens"]), "total_filtrado": len(filtrados), "filtros_aplicados": aplicados,
+             "categorias_da_busca": _categorias(b["itens"]),
              "pagina": pagina, "paginas": max(1, -(-len(filtrados) // limite)),
              "prospects": [_compacto(i, d, s, obs) for i, d, s, obs in filtrados[ini:ini + limite]]}
         if not filtrados and b["itens"]:
-            r["dica"] = "Nenhum resultado com esses filtros; repita sem filtros (sem argumentos além de busca_id)."
+            r["dica"] = ("Nenhum resultado com esses filtros. Para tipo de negócio, use em 'categoria' um nome exato de "
+                         "categorias_da_busca; ou repita sem filtros.")
         return r
 
     def busca_completa(self, busca_id=None):
@@ -605,6 +614,37 @@ class TravaArquivo:
         return True
 
 
+def _norm(v):
+    """minúsculas, sem acentos, espaços simples."""
+    t = unicodedata.normalize("NFKD", str(v or "")).encode("ascii", "ignore").decode().lower()
+    return " ".join(re.findall(r"[a-z0-9@.]+", t))
+
+
+PALAVRAS_VAZIAS = {"de", "da", "do", "das", "dos", "e", "a", "o", "as", "os", "em", "para", "com", "ou"}
+
+
+def _casa_texto(consulta, alvo):
+    """Todas as palavras da consulta aparecem no alvo, em qualquer ordem, sem acento/maiúsculas e tolerando
+    plural/gênero ("distribuidora farmaceutica" casa com "Distribuidora de Produtos Farmacêuticos")."""
+    palavras = [w for w in _norm(consulta).split() if w not in PALAVRAS_VAZIAS]
+    tokens = _norm(alvo).split()
+    for w in palavras:
+        raiz = w[:max(4, len(w) - 3)] if len(w) > 4 else w
+        if not any(t.startswith(raiz) or raiz in t for t in tokens):
+            return False
+    return True
+
+
+def _categorias(itens, maximo=40):
+    """Categorias exatas do Google Maps presentes na busca, com quantas empresas cada uma tem."""
+    cont = {}
+    for d in itens:
+        c = (d.get("categoria") or "").strip() or "(sem categoria)"
+        cont[c] = cont.get(c, 0) + 1
+    ordem = sorted(cont.items(), key=lambda x: (-x[1], x[0]))
+    return [{"categoria": c, "empresas": n} for c, n in ordem[:maximo]]
+
+
 def _trinario(v):
     """'sim'/'nao'/'qualquer' (ou bool) -> True/False/None."""
     if isinstance(v, bool):
@@ -682,17 +722,23 @@ FERRAMENTAS = [
      "parametros": {"limite": {"type": "integer"}}},
     {"nome": "consultar_prospects", "metodo": "consultar_prospects",
      "descricao": ("Lista e filtra as empresas (prospects) de uma busca concluída; sem busca_id, usa a busca aberta no "
-                   "painel ou a última. Mande SÓ os filtros que o usuário pediu: campos omitidos não filtram. Para "
+                   "painel ou a última. Toda resposta traz categorias_da_busca (categorias exatas do Google Maps com "
+                   "a contagem): para pedidos por tipo de negócio, filtre com categoria= um desses nomes. Mande SÓ os "
+                   "filtros que o usuário pediu: campos omitidos não filtram. Para "
                    "analisar ou classificar a busca toda (ex.: 'quais parecem fundos de venture capital?'), chame sem "
                    "filtros com limite=100 e percorra as páginas, julgando por nome, categoria e site. Devolve dados "
                    "resumidos; use detalhar_prospect para links e mensagem."),
      "parametros": {"busca_id": {"type": "integer", "description": "omita para a busca aberta/última"},
+                    "categoria": dict(_TXT, description=(
+                        "categoria do Google Maps, copiada EXATAMENTE de categorias_da_busca (que vem em toda resposta); "
+                        "várias separadas por |. Melhor jeito de filtrar por tipo de negócio")),
                     "prioridade": dict(_TXT, description="A, B, C ou combinação como 'AB'"),
                     "whatsapp": {"type": "string", "enum": ["qualquer", "sim", "nao"],
                                  "description": "sim = só com WhatsApp; nao = só sem; omita para qualquer"},
                     "email": {"type": "string", "enum": ["qualquer", "sim", "nao"],
                               "description": "sim = só com e-mail; nao = só sem; omita para qualquer"},
-                    "texto": dict(_TXT, description="trecho do nome, categoria, site, endereço ou bairro"),
+                    "texto": dict(_TXT, description=("palavras do nome, categoria, site, endereço ou bairro; todas "
+                                                      "precisam aparecer, em qualquer ordem, sem ligar para acento")),
                     "bairro": _TXT,
                     "status": {"type": "string", "enum": ["qualquer", "sem_status", "interessado", "contatado",
                                                           "visitar", "cliente", "sem_interesse"]},

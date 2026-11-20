@@ -259,6 +259,25 @@ class FerramentasTest(unittest.TestCase):
         self.assertEqual(r["filtros_aplicados"], {"whatsapp": True, "max_km": 0.5, "status": "sem_status"})
         self.assertTrue(all(p["distancia_km"] <= 0.5 for p in r["prospects"]))
 
+    def test_categorias_exatas_e_texto_tolerante(self):
+        rows = [linha("Biotec Nutri", *geo.deslocar(CENTRO.lat, CENTRO.lon, 100, 0), category="Distribuidora de Produtos Farmacêuticos"),
+                linha("SAR Medicamentos", *geo.deslocar(CENTRO.lat, CENTRO.lon, 200, 0), category="Empresa farmacêutica"),
+                linha("Oncoprod", *geo.deslocar(CENTRO.lat, CENTRO.lon, 300, 0), category="Distribuidora de Produtos Farmacêuticos"),
+                linha("Drogaria X", *geo.deslocar(CENTRO.lat, CENTRO.lon, 400, 0), category="Drogaria")]
+        app = criar_app(self.tmp, rows)
+        esperar_tarefa(app, app.iniciar_busca("Rua A", raio_km=1, perfil="ti")["tarefa_id"])
+        r, _ = chamar(app, "consultar_prospects", {"texto": "nada que exista"})
+        self.assertEqual(r["total_filtrado"], 0)  # mesmo vazia, a resposta mostra as categorias exatas
+        self.assertEqual(r["categorias_da_busca"][0], {"categoria": "Distribuidora de Produtos Farmacêuticos", "empresas": 2})
+        r, _ = chamar(app, "consultar_prospects", {"categoria": "distribuidora de produtos farmaceuticos"})
+        self.assertEqual(sorted(p["nome"] for p in r["prospects"]), ["Biotec Nutri", "Oncoprod"])
+        r, _ = chamar(app, "consultar_prospects", {"categoria": "Drogaria | Empresa farmacêutica"})
+        self.assertEqual(r["total_filtrado"], 2)
+        r, _ = chamar(app, "consultar_prospects", {"texto": "distribuidora farmaceutica"})  # sem acento, singular
+        self.assertEqual(r["total_filtrado"], 2)
+        self.assertIn("categoria: distribuidora", chat._resumo_acao("consultar_prospects", {}, chamar(
+            app, "consultar_prospects", {"categoria": "distribuidora de produtos farmaceuticos"})[0], False))
+
     def test_erros_viram_mensagem(self):
         res, erro = chamar(self.app, "iniciar_busca", {"endereco": "lugar que nada existe", "perfil": "ti"})
         self.assertTrue(erro)
