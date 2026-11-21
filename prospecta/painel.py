@@ -213,6 +213,9 @@ class Manipulador(BaseHTTPRequestHandler):
             return self._enviar(200, self._estado())
         if caminho == "/api/tarefas":
             return self._enviar(200, app.listar_tarefas(8))
+        m = re.fullmatch(r"/api/tarefas/(\d+)", caminho)
+        if m:
+            return self._enviar(200, app.andamento_busca(int(m.group(1))))
         m = re.fullmatch(r"/api/buscas/(\d+)", caminho)
         if m:
             return self._enviar(200, app.busca_completa(int(m.group(1))))

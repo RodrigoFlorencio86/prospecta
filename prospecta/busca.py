@@ -183,20 +183,32 @@ def mensagem_para(p, perfil, meu_nome="", minha_empresa=""):
                                       minha_empresa=minha_empresa, bairro=p.bairro)
 
 
-def prospectar(motor, centro, raio_m, perfil, modo="rapido", progresso=None, cancelar=None, ler_sites=True):
+def prospectar(motor, centro, raio_m, perfil, modo="rapido", progresso=None, cancelar=None, ler_sites=True,
+               eventos=None):
     """Executa a prospecção inteira -> Resultado. progresso(feitos, total, lugares) é chamado a cada
-    centro de busca concluído e durante a espera."""
+    centro de busca concluído e durante a espera. eventos(tipo, dados), opcional, recebe o passo a passo
+    para quem quer mostrar o andamento: "plano", "area", "andamento", "area_fim" e "etapa"."""
+    def avisar(tipo, **dados):
+        if eventos:
+            eventos(tipo, dados)
+
     inicio = time.monotonic()
     pontos, m = plano(raio_m, modo, centro.lat, centro.lon)
+    espacamento = max(m["minimo"], raio_m * m["fator"])
+    avisar("plano", areas=[{"lat": p["lat"], "lon": p["lon"]} for p in pontos],
+           raio_area_m=round(min(espacamento / 3 ** 0.5 * 1.05, max(raio_m, 300))), alvos=list(perfil.alvos))
     linhas, avisos, feitos, falhas = [], [], 0, 0
     for i, pt in enumerate(pontos, 1):
         if cancelar is not None and cancelar.is_set():
             raise Cancelado()
+        avisar("area", i=i, total=len(pontos))
 
         def _prog(pct, lugares, etapa, i=i):
             if progresso:
                 progresso(i - 1 + pct / 100, len(pontos), len(linhas) + lugares)
+            avisar("andamento", i=i, pct=pct, lugares=lugares, etapa=etapa)
 
+        falhou = False
         try:
             jid = motor.criar(f"prospecta {perfil.nome} {i}/{len(pontos)}", perfil.alvos, pt["lat"], pt["lon"],
                               pt["zoom"], m["profundidade"], m["avaliacoes"])
@@ -204,10 +216,12 @@ def prospectar(motor, centro, raio_m, perfil, modo="rapido", progresso=None, can
         except ErroMotor as ex:
             falhas += 1
             if falhas == i and (i >= 2 or len(pontos) == 1):  # nada funcionou: não adianta insistir
+                avisar("area_fim", i=i, estado="falhou", linhas=[], aviso=str(ex))
                 raise
-            novas, aviso = [], f"área {i} falhou: {ex}"
+            novas, aviso, falhou = [], f"área {i} falhou: {ex}", True
         linhas.extend(novas)
         feitos = i
+        avisar("area_fim", i=i, estado="falhou" if falhou else ("parcial" if aviso else "ok"), linhas=novas, aviso=aviso)
         if aviso:
             avisos.append(aviso)
             if BLOQUEIO in aviso.lower():
@@ -216,7 +230,10 @@ def prospectar(motor, centro, raio_m, perfil, modo="rapido", progresso=None, can
                 break
         if progresso:
             progresso(i, len(pontos), len(linhas))
+    avisar("etapa", nome="juntar", lugares=len(linhas))
     prospects = juntar(linhas, centro, raio_m)
+    avisar("etapa", nome="sites", empresas=len(prospects), sites=len({p.site for p in prospects if p.site}) if ler_sites else 0)
     enriquecer(prospects, ler_sites)
+    avisar("etapa", nome="notas", empresas=len(prospects))
     pontuar(prospects, perfil, raio_m)
     return Resultado(prospects, avisos, feitos, len(pontos), time.monotonic() - inicio, len(linhas))

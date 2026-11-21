@@ -196,8 +196,11 @@ python3 -m prospecta painel
 
 Abre `http://127.0.0.1:8765` no seu navegador, servido pelo seu próprio computador.
 
-- **Nova busca:** endereço ou CEP, o seu serviço, raio e modo. A busca roda em segundo plano, com
-  barra de progresso, e continua mesmo se você fechar a página.
+- **Nova busca:** endereço ou CEP, o seu serviço, raio e modo. A busca roda em segundo plano e
+  continua mesmo se você fechar a página.
+- **Andamento ao vivo:** enquanto a busca roda, a coluna do meio mostra as etapas, o tempo que falta,
+  o mapa com as áreas já varridas e as empresas aparecendo, as categorias encontradas e o passo a
+  passo. Clique na busca em **Andamento** para abrir esses detalhes a qualquer momento.
 - **Resultados:** mapa, filtros, lista com WhatsApp, rota e Waze, status de cada contato e
   anotações, rota otimizada e exportação.
 - **Assistente:** clique em **Continuar com ChatGPT** e converse. Ele usa o **seu plano do ChatGPT**

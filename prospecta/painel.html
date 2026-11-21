@@ -50,6 +50,41 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 .hist li:hover, .hist li.sel { background:var(--azul-claro); }
 .hist small { color:var(--suave); display:block; }
 #mapa { height:330px; border-radius:10px; border:1px solid var(--linha); margin:10px 0; }
+.tarefa.clicavel { cursor:pointer; border-radius:8px; margin:0 -6px; padding:8px 6px; }
+.tarefa.clicavel:hover, .tarefa.sel { background:var(--azul-claro); }
+.tarefa .ver { color:var(--azul); font-weight:600; white-space:nowrap; }
+.and-topo { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+.and-topo h2 { font-size:1.1rem; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 4px; }
+.chips span { font-size:.78rem; border:1px solid var(--linha); border-radius:999px; padding:2px 9px; color:var(--suave); }
+.barra.grande { height:12px; border-radius:6px; margin:12px 0 4px; }
+.barra.grande > i { background:linear-gradient(90deg,var(--azul),#2b7de9); }
+.barra.viva > i { background-image:linear-gradient(110deg,var(--azul) 40%,#5d9bf0 50%,var(--azul) 60%); background-size:200% 100%; animation:brilho 1.6s linear infinite; }
+@keyframes brilho { from { background-position:100% 0; } to { background-position:-100% 0; } }
+.and-nums { display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.and-nums b { font-size:1.4rem; }
+.etapas { list-style:none; padding:0; margin:12px 0 6px; display:grid; grid-template-columns:repeat(6,1fr); gap:6px; counter-reset:e; }
+.etapas li { position:relative; font-size:.78rem; line-height:1.25; color:var(--suave); padding-top:30px; text-align:center; }
+.etapas li::before { counter-increment:e; content:counter(e); position:absolute; top:0; left:50%; transform:translateX(-50%); width:24px; height:24px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.8rem; background:var(--fundo); border:2px solid var(--linha); }
+.etapas li.feita { color:var(--texto); } .etapas li.feita::before { content:"✓"; background:var(--ok); border-color:var(--ok); color:#fff; }
+.etapas li.agora { color:var(--texto); font-weight:650; } .etapas li.agora::before { border-color:var(--azul); color:var(--azul); animation:pulsa 1.4s ease-in-out infinite; }
+.etapas li.erro::before { content:"!"; background:var(--erro); border-color:var(--erro); color:#fff; }
+.etapas li small { display:block; font-weight:400; color:var(--suave); }
+@keyframes pulsa { 50% { box-shadow:0 0 0 6px rgba(31,95,191,.18); } }
+#mapa-and { height:300px; border-radius:10px; border:1px solid var(--linha); margin:10px 0 4px; }
+.leg { display:inline-block; width:10px; height:10px; border-radius:50%; border:2px solid var(--c); margin:0 3px 0 8px; vertical-align:-1px; }
+.leg.pto { background:#f28c28; border-color:#fff; box-shadow:0 0 0 1px #f28c28; }
+.and-grade { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px; }
+.and-grade h3 { font-size:.9rem; margin:0 0 8px; }
+.cat { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; font-size:.83rem; margin-bottom:7px; }
+.cat span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cat i { grid-column:1 / -1; display:block; height:6px; border-radius:3px; background:#f28c28; opacity:.85; }
+.log { list-style:none; padding:0; margin:0; font-size:.83rem; max-height:230px; overflow:auto; }
+.log li { padding:4px 0; border-bottom:1px solid var(--linha); display:flex; gap:8px; }
+.log li time { color:var(--suave); font-variant-numeric:tabular-nums; flex:none; }
+.and-acoes { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+@media (max-width: 760px) { .and-grade { grid-template-columns:1fr; } .etapas { grid-template-columns:repeat(3,1fr); row-gap:12px; } }
 .kpis { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
 .kpi { border:1px solid var(--linha); border-radius:10px; padding:6px 10px; font-size:.85rem; }
 .kpi b { display:block; font-size:1.05rem; }
@@ -172,6 +207,27 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
   <!-- coluna 2: resultados -->
   <section id="col-res">
     <div class="cartao" id="res">
+      <div id="res-and" class="oculto">
+        <div class="and-topo">
+          <div><h2 id="and-titulo"></h2><div class="dica" id="and-sub"></div></div>
+          <button class="peq" id="and-fechar" title="Fechar o andamento">✕</button>
+        </div>
+        <div class="chips" id="and-alvos"></div>
+        <div class="barra grande"><i id="and-barra"></i></div>
+        <div class="and-nums"><b id="and-pct"></b><span class="dica" id="and-tempo"></span></div>
+        <ol class="etapas" id="and-etapas"></ol>
+        <div class="kpis" id="and-kpis"></div>
+        <div id="mapa-and"></div>
+        <div class="dica" id="and-legenda">
+          <span class="leg" style="--c:#6b7787;border-style:dashed"></span>na fila <span class="leg" style="--c:#1f5fbf"></span>procurando
+          <span class="leg" style="--c:#1e8e3e"></span>concluída <span class="leg" style="--c:#c62828"></span>falhou
+          <span class="leg pto"></span>empresa encontrada</div>
+        <div class="and-grade">
+          <div><h3>O que já apareceu</h3><div id="and-cats"></div></div>
+          <div><h3>Passo a passo</h3><ul class="log" id="and-log"></ul></div>
+        </div>
+        <div class="and-acoes" id="and-acoes"></div>
+      </div>
       <div id="res-vazio" class="vazio">Faça uma busca ou escolha uma anterior para ver as empresas aqui.</div>
       <div id="res-cheio" class="oculto">
         <h2 id="res-titulo"></h2>
@@ -250,7 +306,8 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const url = u => /^https?:\/\//.test(u || "") ? u : "";
 let E = null, BUSCA = null, mapa = null, camada = null, vigia = null, ultimasOk = new Set();
-let CONV = null, CONVS = [];  // conversa aberta no chat e lista de conversas salvas
+let CONV = null, CONVS = [];
+let ANDA = null, mapaAnd = null, camadaAnd = null, pontosAnd = null, vigiaAnd = null;  // andamento aberto no centro  // conversa aberta no chat e lista de conversas salvas
 
 async function api(caminho, corpo) {
   const op = {headers: {"X-Prospecta": TOKEN}};
@@ -280,7 +337,7 @@ async function carregar() {
   $("#c-base-atual").textContent = E.config.base ? "Atual: " + E.config.base.descricao : "";
   atualizarRaio(); trocarPerfil(); desenharTarefas(E.tarefas); desenharHist(); desenharConta();
   E.tarefas.filter(t => t.estado === "ok").forEach(t => ultimasOk.add(t.tarefa_id));
-  if (!BUSCA && E.buscas.length) abrirBusca(E.buscas[0].busca_id);
+  if (!BUSCA && E.buscas.length) abrirBusca(E.buscas[0].busca_id, "carga");
   vigiar();
 }
 function atualizarRaio() { $("#b-raio-txt").textContent = km(+$("#b-raio").value); }
@@ -303,7 +360,7 @@ $("#f-busca").addEventListener("submit", async ev => {
   try {
     const r = await api("/api/buscas", corpo);
     aviso(`Busca iniciada: ~${r.estimativa_min} min. Pode fechar esta página; ela continua.`, 6000);
-    carregar();
+    await carregar(); abrirAndamento(r.tarefa_id);
   } catch (e) { aviso("⚠️ " + e.message, 7000); }
   finally { $("#b-ir").disabled = false; }
 });
@@ -321,18 +378,20 @@ function desenharTarefas(ts) {
   const nomes = {fila: "na fila", rodando: "buscando", cancelar: "cancelando", ok: "pronta", erro: "erro", cancelada: "cancelada"};
   const vis = ts.slice(0, 5);
   $("#tarefas").innerHTML = vis.length ? vis.map(t => `
-    <div class="tarefa">
+    <div class="tarefa clicavel ${ANDA && ANDA.id === t.tarefa_id ? "sel" : ""}" data-tarefa="${t.tarefa_id}" title="Ver o andamento em detalhes">
       <div><b>${esc(nomes[t.estado] || t.estado)}</b> · ${esc(t.descricao)}</div>
       ${["fila", "rodando", "cancelar"].includes(t.estado) ? `<div class="barra"><i style="width:${Math.max(3, t.progresso_pct)}%"></i></div>
         <div class="dica">${esc(t.mensagem || "")} · ${t.lugares_lidos} lugares lidos · estimativa ~${esc(t.estimativa_min)} min
-        <button class="peq" data-cancelar="${t.tarefa_id}">Cancelar</button></div>`
+        <button class="peq" data-cancelar="${t.tarefa_id}">Cancelar</button> <span class="ver">Detalhes ›</span></div>`
       : `<div class="dica">${esc(t.criada)} · ${esc(t.mensagem || "")} ${t.busca_id ? `<a href="#" data-abrir="${t.busca_id}">ver</a>` : ""}</div>`}
     </div>`).join("") : '<p class="dica">Nenhuma busca recente.</p>';
 }
 $("#tarefas").addEventListener("click", async ev => {
   const c = ev.target.dataset.cancelar, a = ev.target.dataset.abrir;
   if (c) { ev.preventDefault(); try { await api(`/api/tarefas/${c}/cancelar`, {}); vigiar(true); } catch (e) { aviso(e.message); } }
-  if (a) { ev.preventDefault(); abrirBusca(+a); }
+  if (a) { ev.preventDefault(); abrirBusca(+a); return; }
+  const caixa = !c && ev.target.closest("[data-tarefa]");
+  if (caixa) abrirAndamento(+caixa.dataset.tarefa);
 });
 async function vigiar(agora) {
   clearTimeout(vigia);
@@ -350,6 +409,125 @@ async function vigiar(agora) {
   }, agora ? 300 : 3000);
 }
 
+// ── andamento de uma busca, na coluna central ──
+const ETAPAS = [["motor", "Preparar o motor"], ["areas", "Procurar no mapa"], ["juntar", "Tirar repetidos"],
+                ["sites", "Ler sites"], ["notas", "Calcular notas"], ["fim", "Pronto"]];
+const COR_AREA = {fila: "#6b7787", rodando: "#1f5fbf", ok: "#1e8e3e", parcial: "#d39200", falhou: "#c62828"};
+const ATIVA = e => ["fila", "rodando", "cancelar"].includes(e);
+function tempo(s) {
+  if (s == null) return "";
+  s = Math.max(0, Math.round(s));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60), r = s % 60;
+  return m < 60 ? `${m} min${r && m < 10 ? ` ${r} s` : ""}` : `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+function abrirAndamento(id) {
+  if (!ANDA || ANDA.id !== id) ANDA = {id, dados: null, enquadrado: false};
+  $("#res-vazio").classList.add("oculto"); $("#res-cheio").classList.add("oculto"); $("#res-and").classList.remove("oculto");
+  if (E) desenharTarefas(E.tarefas);
+  atualizarAndamento();
+}
+function fecharAndamento(silencioso) {
+  clearTimeout(vigiaAnd);
+  if (!ANDA) return;
+  ANDA = null; pontosAnd = null;
+  $("#res-and").classList.add("oculto");
+  if (!silencioso) {
+    if (BUSCA) { $("#res-cheio").classList.remove("oculto"); desenharMapa(); } else $("#res-vazio").classList.remove("oculto");
+  }
+  if (E) desenharTarefas(E.tarefas);
+}
+$("#and-fechar").onclick = () => fecharAndamento();
+async function atualizarAndamento() {
+  clearTimeout(vigiaAnd);
+  if (!ANDA) return;
+  const id = ANDA.id;
+  let d;
+  try { d = await api(`/api/tarefas/${id}`); } catch (e) { aviso("⚠️ " + e.message); fecharAndamento(); return; }
+  if (!ANDA || ANDA.id !== id) return;
+  ANDA.dados = d; desenharAndamento(d);
+  if (ATIVA(d.estado)) vigiaAnd = setTimeout(atualizarAndamento, 2000);
+}
+function desenharAndamento(t) {
+  const x = t.detalhe || {}, areas = x.areas || [], ativa = ATIVA(t.estado);
+  const feitas = areas.filter(a => a.estado !== "fila" && a.estado !== "rodando").length;
+  const titulos = {fila: "⏳ Na fila", rodando: "🔎 Buscando", cancelar: "Cancelando", ok: "✅ Busca concluída", erro: "⚠️ A busca parou", cancelada: "Busca cancelada"};
+  $("#and-titulo").textContent = `${titulos[t.estado] || t.estado}: ${t.servico}`;
+  $("#and-sub").textContent = `até ${String(t.raio_km).replace(".", ",")} km de ${t.local.descricao} · modo ${t.modo}${t.so_novos ? " · só empresas novas" : ""} · iniciada ${t.criada}`;
+  $("#and-alvos").innerHTML = t.alvos.map(a => `<span>${esc(a)}</span>`).join("");
+  const pct = t.estado === "ok" ? 100 : t.progresso_pct;
+  $("#and-barra").style.width = Math.max(2, pct) + "%";
+  $("#and-barra").parentElement.classList.toggle("viva", t.estado === "rodando");
+  $("#and-pct").textContent = t.estado === "fila" ? "Aguardando" : `${pct}%`;
+  $("#and-tempo").textContent = t.estado === "fila"
+    ? (t.na_frente ? `${t.na_frente} busca${t.na_frente > 1 ? "s" : ""} na frente · ` : "") + `estimativa ~${t.estimativa_min} min depois de começar`
+    : ativa ? `${tempo(t.decorrido_s)} decorridos` + (t.restante_s != null ? ` · faltam ~${tempo(t.restante_s)}` : "")
+    : `levou ${tempo(t.decorrido_s)}`;
+  // etapas
+  const etapa = x.etapa === "erro" || x.etapa === "cancelada" ? x.parou_em : (t.estado === "ok" ? "fim" : x.etapa);
+  const idx = t.estado === "fila" ? -1 : ETAPAS.findIndex(e => e[0] === etapa);
+  $("#and-etapas").innerHTML = ETAPAS.map(([k, nome], i) => {
+    let cls = i < idx || (t.estado === "ok") ? "feita" : i === idx ? (x.etapa === "erro" || x.etapa === "cancelada" ? "erro" : "agora") : "";
+    let sub = k === "areas" && areas.length ? `${feitas} de ${areas.length}` + (i === idx && ativa && x.area_atual ? ` · área ${x.area_atual}: ${x.area_pct || 0}%` : "") : "";
+    return `<li class="${cls}">${esc(nome)}${sub ? `<small>${esc(sub)}</small>` : ""}</li>`;
+  }).join("");
+  // números
+  const cats = Object.entries(x.categorias || {}).sort((a, b) => b[1] - a[1]);
+  const achadas = cats.reduce((s, c) => s + c[1], 0);
+  $("#and-kpis").innerHTML = [[achadas, ativa ? "empresas no raio até agora" : "empresas no raio"], [areas.length ? `${feitas}/${areas.length}` : (t.areas_previstas || "–"), "áreas do mapa"],
+    [t.alvos.length, "tipos de negócio"], [x.brutos || 0, "resultados lidos"]]
+    .map(([v, n]) => `<div class="kpi"><b>${esc(v)}</b>${esc(n)}</div>`).join("")
+    + (x.avisos || []).slice(-2).map(a => `<div class="kpi" style="border-color:var(--erro)">⚠️ ${esc(a)}</div>`).join("");
+  // categorias
+  const max = cats.length ? cats[0][1] : 1;
+  $("#and-cats").innerHTML = cats.length ? cats.slice(0, 8).map(([c, n]) => `<div class="cat"><span>${esc(c)}</span><b>${n}</b><i style="width:${Math.max(4, 100 * n / max)}%"></i></div>`).join("")
+    + (cats.length > 8 ? `<div class="dica">e mais ${cats.length - 8} categorias</div>` : "")
+    : `<p class="dica">${t.estado === "fila" ? "A busca ainda não começou." : "As empresas aparecem aqui conforme cada área termina."}</p>`;
+  // passo a passo
+  const ev = (x.eventos || []).slice().reverse();
+  $("#and-log").innerHTML = ev.length ? ev.map(([ts, txt]) => `<li><time>${new Date(ts * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit", second: "2-digit"})}</time><span>${esc(txt)}</span></li>`).join("")
+    : `<li><span class="dica">${t.estado === "fila" ? "Esperando a vez." : "Começando…"}</span></li>`;
+  // ações
+  $("#and-acoes").innerHTML = (ativa && t.estado !== "cancelar" ? `<button data-cancelar-and="${t.tarefa_id}">Cancelar busca</button>` : "")
+    + (t.estado === "ok" && t.busca_id ? `<button class="prim" data-abrir-and="${t.busca_id}">Ver as empresas</button>` : "")
+    + (t.estado === "erro" ? `<p class="dica" style="color:var(--erro)">${esc(t.mensagem)}</p>` : "");
+  desenharMapaAnd(t);
+}
+$("#and-acoes").addEventListener("click", async ev => {
+  const c = ev.target.dataset.cancelarAnd, a = ev.target.dataset.abrirAnd;
+  if (c) { try { await api(`/api/tarefas/${c}/cancelar`, {}); vigiar(true); atualizarAndamento(); } catch (e) { aviso(e.message); } }
+  if (a) abrirBusca(+a);
+});
+function desenharMapaAnd(t) {
+  const x = t.detalhe || {};
+  if (!window.L) { $("#mapa-and").classList.add("oculto"); $("#and-legenda").classList.add("oculto"); return; }
+  if (!mapaAnd) {
+    mapaAnd = L.map("mapa-and", {preferCanvas: true});
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      referrerPolicy: "strict-origin-when-cross-origin"}).addTo(mapaAnd);
+  }
+  if (camadaAnd) camadaAnd.remove();
+  camadaAnd = L.layerGroup().addTo(mapaAnd);
+  const c = t.local;
+  L.circle([c.lat, c.lon], {radius: t.raio_km * 1000, color: "#1f5fbf", weight: 1.5, dashArray: "6 6", fillOpacity: .03, interactive: false}).addTo(camadaAnd);
+  (x.areas || []).forEach((a, i) => L.circle([a.lat, a.lon], {radius: x.raio_area_m || 500, color: COR_AREA[a.estado] || "#9aa6b3", weight: a.estado === "rodando" ? 3 : 1.5,
+    fillOpacity: a.estado === "rodando" ? .16 : a.estado === "fila" ? .06 : .08, dashArray: a.estado === "fila" ? "3 6" : null}).addTo(camadaAnd)
+    .bindTooltip(`Área ${i + 1}: ${{fila: "na fila", rodando: "procurando agora", ok: "concluída", parcial: "parou no meio", falhou: "falhou"}[a.estado] || a.estado}${a.estado !== "fila" && a.estado !== "rodando" ? ` · ${a.novos} novas` : ""}`));
+  L.circleMarker([c.lat, c.lon], {radius: 6, color: "#1f5fbf", fillOpacity: 1}).addTo(camadaAnd).bindTooltip("Centro da busca");
+  // empresas: só acrescenta as novas, para não piscar
+  const lug = x.lugares || [];
+  if (!pontosAnd || pontosAnd.id !== t.tarefa_id || pontosAnd.n > lug.length) {
+    if (pontosAnd) pontosAnd.camada.remove();
+    pontosAnd = {id: t.tarefa_id, n: 0, camada: L.layerGroup().addTo(mapaAnd)};
+  }
+  lug.slice(pontosAnd.n).forEach(([la, lo, nome, cat]) => L.circleMarker([la, lo], {radius: 4, color: "#fff", weight: 1, fillColor: "#f28c28", fillOpacity: .95})
+    .addTo(pontosAnd.camada).bindTooltip(`${esc(nome)}<br><small>${esc(cat)}</small>`));
+  pontosAnd.n = lug.length;
+  pontosAnd.camada.remove(); pontosAnd.camada.addTo(mapaAnd);  // empresas por cima das áreas
+  if (!ANDA.enquadrado) { mapaAnd.fitBounds(L.latLng(c.lat, c.lon).toBounds(t.raio_km * 2300)); ANDA.enquadrado = true; }
+  setTimeout(() => mapaAnd.invalidateSize(), 50);
+}
+
 // ── histórico e resultados ──
 function desenharHist() {
   $("#hist").innerHTML = E.buscas.length ? E.buscas.map(b => `<li data-id="${b.busca_id}" class="${BUSCA && BUSCA.busca_id === b.busca_id ? "sel" : ""}">
@@ -361,7 +539,10 @@ $("#hist").addEventListener("click", ev => { const li = ev.target.closest("li[da
 
 async function abrirBusca(id, origem) {
   try { BUSCA = await api(`/api/buscas/${id}`); } catch (e) { aviso(e.message); return; }
-  $("#res-vazio").classList.add("oculto"); $("#res-cheio").classList.remove("oculto");
+  if (origem !== "carga" || !ANDA) {  // ao carregar a página, não tira o andamento que já está aberto
+    fecharAndamento(true);
+    $("#res-vazio").classList.add("oculto"); $("#res-cheio").classList.remove("oculto");
+  }
   $("#rota").classList.add("oculto"); $("#links-exp").textContent = "";
   $("#res-titulo").textContent = `${BUSCA.servico}: ${BUSCA.itens.length} empresas`;
   $("#res-sub").textContent = `${BUSCA.data} · até ${BUSCA.raio_km} km de ${BUSCA.local.descricao}` + (BUSCA.ocultos ? ` · ${BUSCA.ocultos} já vistas ocultadas` : "");

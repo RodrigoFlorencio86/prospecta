@@ -15,7 +15,7 @@ from unittest import mock
 
 from prospecta import chat, chatgpt, geo, mcp_servidor, painel
 from prospecta.config import Config
-from prospecta.ferramentas import Prospecta, TravaArquivo, chamar
+from prospecta.ferramentas import ErroFerramenta, Prospecta, TravaArquivo, chamar
 from tests.apoio import CENTRO, GeoFalso, MotorFalso, linha
 from tests.openai_falsa import OpenAIFalsa
 
@@ -272,6 +272,58 @@ class FerramentasTest(unittest.TestCase):
         self.assertEqual(self.app.resumo_funil()["em_andamento"][0]["observacao"], "ligar segunda")
         self.assertEqual(self.app.busca_completa(bid)["servico"], "Fornos")
 
+    def test_andamento_detalhado(self):
+        """O painel acompanha a busca área por área: empresas achadas, categorias, etapas e tempo."""
+        r = self.app.iniciar_busca("Rua A, 1", raio_km=3, perfil="limpeza")
+        self.assertEqual(esperar_tarefa(self.app, r["tarefa_id"])["estado"], "ok")
+        a = self.app.andamento_busca(r["tarefa_id"])
+        x = a["detalhe"]
+        n = len(x["areas"])
+        self.assertGreater(n, 1)
+        self.assertEqual(n, r["areas"])
+        self.assertEqual({ar["estado"] for ar in x["areas"]}, {"ok"})
+        self.assertEqual(x["etapa"], "fim")
+        self.assertEqual(x["categorias"], {"Padaria": 8})  # as mesmas 8 em todas as áreas: contadas uma vez
+        self.assertEqual(len(x["lugares"]), 8)
+        self.assertEqual(x["brutos"], 8 * n)
+        self.assertEqual(sum(ar["novos"] for ar in x["areas"]), 8)
+        textos = [e[1] for e in x["eventos"]]
+        self.assertIn("Preparando o motor de busca", textos)
+        self.assertTrue(any(tx.startswith("Pronto: 8 prospects") for tx in textos))
+        self.assertEqual((a["servico"], a["raio_km"], a["estado"], a["restante_s"]), ("Limpeza e conservação", 3, "ok", None))
+        self.assertGreater(x["raio_area_m"], 0)
+        self.assertNotIn("detalhe", self.app.db.tarefas(0)[0])  # a lista continua leve
+        with self.assertRaises(ErroFerramenta):
+            self.app.andamento_busca(999)
+
+    def test_andamento_quando_falha(self):
+        from prospecta.motor import ErroMotor
+
+        class MotorQuebrado(MotorFalso):
+            def executar(self, jid, cancelar=None, progresso=None, espera_max=0):
+                raise ErroMotor("o motor caiu")
+        self.app.motor = MotorQuebrado()
+        r = self.app.iniciar_busca("Rua A, 1", raio_km=3, perfil="limpeza")
+        self.assertEqual(esperar_tarefa(self.app, r["tarefa_id"])["estado"], "erro")
+        x = self.app.andamento_busca(r["tarefa_id"])["detalhe"]
+        self.assertEqual((x["etapa"], x["parou_em"]), ("erro", "areas"))
+        self.assertEqual([ar["estado"] for ar in x["areas"][:2]], ["falhou", "falhou"])
+        self.assertIn("Erro: o motor caiu", x["eventos"][-1][1])
+
+    def test_banco_antigo_ganha_coluna_de_detalhe(self):
+        import sqlite3
+        from prospecta.banco import Banco
+        caminho = self.tmp / "antigo.db"
+        con = sqlite3.connect(caminho)
+        con.execute("CREATE TABLE tarefas (id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER NOT NULL, criada REAL NOT NULL,"
+                    " atualizada REAL NOT NULL, estado TEXT NOT NULL, parametros TEXT NOT NULL, descricao TEXT DEFAULT '',"
+                    " progresso REAL DEFAULT 0, lugares INTEGER DEFAULT 0, mensagem TEXT DEFAULT '', busca_id INTEGER, dono TEXT DEFAULT '')")
+        con.execute("INSERT INTO tarefas (chat_id, criada, atualizada, estado, parametros) VALUES (0, 1, 1, 'ok', '{}')")
+        con.commit()
+        con.close()
+        db = Banco(caminho)
+        self.assertEqual(db.tarefa(1)["detalhe"], {})
+
     def test_campos_vazios_nao_filtram(self):
         """Modelos mandam todos os campos opcionais com "", 0 ou false: isso não pode zerar a consulta."""
         tid = self.app.iniciar_busca("Rua A", raio_km=1.5, perfil="limpeza")["tarefa_id"]
@@ -420,6 +472,10 @@ class PainelTest(BaseOpenAI):
         self.assertTrue(dados.startswith(b"PK"))
         st, r = self.api("/api/buscas", {"endereco": ""})
         self.assertEqual(st, 400)
+        tid = self.api("/api/tarefas")[1][0]["tarefa_id"]
+        st, a = self.api(f"/api/tarefas/{tid}")
+        self.assertEqual((st, a["estado"], a["detalhe"]["etapa"]), (200, "ok", "fim"))
+        self.assertEqual(self.api("/api/tarefas/9999")[0], 400)
 
     def test_login_e_chat_pelo_painel(self):
         st, e = self.api("/api/estado")

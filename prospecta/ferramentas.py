@@ -42,6 +42,107 @@ def _perfil_de(d):
                              sinais=list(d.get("sinais") or []), mensagem=d.get("mensagem") or perfis_mod.MENSAGEM_PADRAO)
 
 
+class Andamento:
+    """Monta o passo a passo de uma busca (áreas do mapa, empresas achadas, etapa) para o painel mostrar
+    enquanto ela roda, e grava no banco sem exagero."""
+    MAX_LUGARES = 1500
+    MAX_EVENTOS = 40
+    ATIVAS = ("fila", "rodando", "cancelar")
+
+    def __init__(self, db, tid, centro, raio_m):
+        self.db, self.tid, self.centro, self.raio_m = db, tid, centro, raio_m
+        self.d = {"inicio": time.time(), "etapa": "motor", "areas": [], "raio_area_m": 0, "area_atual": 0,
+                  "area_pct": 0, "motor_etapa": "", "lugares": [], "categorias": {}, "brutos": 0,
+                  "eventos": [], "avisos": []}
+        self._chaves, self._ultimo = set(), 0.0
+        self.etapa("motor", "Preparando o motor de busca")
+
+    def evento(self, texto):
+        self.d["eventos"].append([round(time.time()), texto])
+        del self.d["eventos"][:-self.MAX_EVENTOS]
+
+    def etapa(self, nome, texto=None):
+        self.d["etapa"] = nome
+        if texto:
+            self.evento(texto)
+        self.gravar(forcar=True, mensagem=texto)
+
+    def gravar(self, forcar=False, mensagem=None):
+        agora = time.monotonic()
+        if not forcar and agora - self._ultimo < 1.5:
+            return
+        self._ultimo = agora
+        campos = {"detalhe": json.dumps(self.d, ensure_ascii=False)}
+        if mensagem:
+            campos["mensagem"] = mensagem
+        self.db.atualizar_tarefa(self.tid, **campos)
+
+    def _somar(self, linhas):
+        novos = 0
+        for r in linhas:
+            self.d["brutos"] += 1
+            try:
+                lat, lon = float(r.get("latitude") or "nan"), float(r.get("longitude") or "nan")
+            except (TypeError, ValueError):
+                continue
+            chave = busca._chave(r)
+            if lat != lat or lon != lon or chave in self._chaves:
+                continue
+            if geo.distancia_m(self.centro.lat, self.centro.lon, lat, lon) > self.raio_m:
+                continue
+            self._chaves.add(chave)
+            novos += 1
+            cat = (r.get("category") or "").strip() or "Sem categoria"
+            self.d["categorias"][cat] = self.d["categorias"].get(cat, 0) + 1
+            if len(self.d["lugares"]) < self.MAX_LUGARES:
+                self.d["lugares"].append([round(lat, 6), round(lon, 6), (r.get("title") or "").strip()[:60], cat[:40]])
+        return novos
+
+    def __call__(self, tipo, dados):
+        d = self.d
+        if tipo == "andamento":
+            d["area_pct"] = max(0, min(100, round(float(dados.get("pct") or 0))))
+            d["motor_etapa"] = str(dados.get("etapa") or "")[:80]
+            return self.gravar()
+        if tipo == "plano":
+            d["areas"] = [dict(a, estado="fila", novos=0) for a in dados["areas"]]
+            d["raio_area_m"] = dados["raio_area_m"]
+            n = len(d["areas"])
+            return self.etapa("areas", f"Raio dividido em {n} área{'s' if n > 1 else ''} de busca no mapa")
+        if tipo == "area":
+            i = dados["i"]
+            d["area_atual"], d["area_pct"], d["motor_etapa"] = i, 0, ""
+            d["areas"][i - 1]["estado"] = "rodando"
+            self.evento(f"Procurando na área {i} de {dados['total']}")
+        elif tipo == "area_fim":
+            i, estado = dados["i"], dados["estado"]
+            novos = self._somar(dados.get("linhas") or [])
+            d["areas"][i - 1].update(estado=estado, novos=novos)
+            if dados.get("aviso"):
+                d["avisos"].append(str(dados["aviso"])[:200])
+            self.evento({"ok": f"Área {i} concluída: {novos} empresa{'s' if novos != 1 else ''} nova{'s' if novos != 1 else ''}",
+                         "parcial": f"Área {i} parou no meio: {novos} empresas novas",
+                         "falhou": f"Área {i} falhou"}.get(estado, f"Área {i}: {estado}"))
+        elif tipo == "etapa":
+            nome = dados["nome"]
+            texto = {"juntar": f"Juntando {dados.get('lugares', 0)} resultados e tirando repetidos",
+                     "sites": (f"Lendo {dados.get('sites')} sites para achar WhatsApp" if dados.get("sites")
+                               else f"{dados.get('empresas', 0)} empresas no raio"),
+                     "notas": f"Calculando a nota de {dados.get('empresas', 0)} empresas"}.get(nome, nome)
+            return self.etapa(nome, texto)
+        self.gravar(forcar=True)
+
+    def fim(self, etapa, texto):
+        if etapa == "fim":
+            self.d["area_pct"] = 100
+        else:  # erro ou cancelada: guarda onde parou, para o painel marcar a etapa certa
+            self.d["parou_em"] = self.d["etapa"]
+            for a in self.d["areas"]:
+                if a["estado"] == "rodando":
+                    a["estado"] = "falhou" if etapa == "erro" else "fila"
+        self.etapa(etapa, texto)
+
+
 class Prospecta:
     def __init__(self, cfg, banco=None, motor=None, geocoder=None, log=None, ligar_motor=True, disparar=None):
         """disparar: como acordar o trabalhador das buscas. Padrão: um processo separado e independente,
@@ -191,6 +292,30 @@ class Prospecta:
                 "estimativa_min": t["parametros"].get("estimativa_min"),
                 "criada": time.strftime("%d/%m %H:%M", time.localtime(t["criada"]))}
 
+    def andamento_busca(self, tarefa_id):
+        """Tudo sobre uma busca (na fila, rodando ou terminada): etapa, áreas do mapa, empresas achadas até
+        agora, tempo decorrido e estimativa do que falta."""
+        self._vigiar_fila()
+        try:
+            t = self.db.tarefa(int(tarefa_id))
+        except (TypeError, ValueError):
+            t = None
+        if not t or t["chat_id"] != EU:
+            raise ErroFerramenta("busca não encontrada")
+        p, d = t["parametros"], t["detalhe"]
+        ativa = t["estado"] in Andamento.ATIVAS
+        decorrido = ((time.time() if ativa else t["atualizada"]) - d["inicio"]) if d.get("inicio") else 0
+        prog, est = t["progresso"] or 0, (p.get("estimativa_min") or 1) * 60
+        restante = None
+        if t["estado"] == "rodando":
+            restante = decorrido * (1 - prog) / prog if prog >= 0.1 and decorrido >= 15 else max(30, est - decorrido)
+        na_frente = sum(1 for x in self.db.tarefas(EU, 50) if x["estado"] in Andamento.ATIVAS and x["id"] < t["id"])
+        return dict(self._tarefa_publica(t), servico=p["perfil"]["nome"], alvos=p["perfil"]["alvos"],
+                    local=p["local"], raio_km=p["raio_km"], modo=busca.MODOS[p["modo"]]["nome"],
+                    so_novos=p.get("so_novos", False), areas_previstas=p.get("areas"),
+                    decorrido_s=round(max(0, decorrido)), restante_s=round(restante) if restante is not None else None,
+                    na_frente=na_frente if t["estado"] == "fila" else 0, detalhe=d)
+
     def cancelar_busca(self, tarefa_id):
         if not self.db.pedir_cancelamento(int(tarefa_id)):
             raise ErroFerramenta("essa busca não está na fila nem rodando")
@@ -246,6 +371,8 @@ class Prospecta:
             self.db.atualizar_tarefa(tid, estado="cancelada", mensagem="cancelada")
             return
         self.db.atualizar_tarefa(tid, estado="rodando", mensagem="começando")
+        L = p["local"]
+        andamento = Andamento(self.db, tid, geo.Local(L["lat"], L["lon"], L["descricao"]), p["raio_km"] * 1000)
         ultimo = [0.0]
 
         def progresso(feitos, total, lugares):
@@ -256,31 +383,36 @@ class Prospecta:
             if self.db.tarefa(tid)["estado"] == "cancelar":
                 cancelar.set()
             self.db.atualizar_tarefa(tid, progresso=min(0.99, feitos / max(total, 1)), lugares=lugares,
-                                     mensagem=f"área {min(int(feitos) + 1, total)} de {total}")
+                                     mensagem=f"área {min(int(feitos) + 1, total)} de {total}"
+                                     if feitos < total else "juntando os resultados")
 
         try:
             if self.ligar_motor:
                 try:
                     if os.environ.get("PROSPECTA_AUTO_INSTALAR") == "1" and not kit.instalado():
-                        self.db.atualizar_tarefa(tid, mensagem="instalando o motor de busca (só na primeira vez)")
+                        andamento.etapa("motor", "Instalando o motor de busca (só na primeira vez)")
                         kit.instalar(log=self.log)
                     kit.garantir(self.motor, self.cfg.motor_url, log=self.log, saida=kit.SAIDA_ERRO, espera=300)
                 except (kit.ErroKit, ErroRede, OSError) as ex:
                     raise ErroMotor(str(ex)) from ex
-            busca_id, info = self._rodar(p, progresso, cancelar)
+            busca_id, info = self._rodar(p, progresso, cancelar, andamento)
         except Cancelado:
+            andamento.fim("cancelada", "Busca cancelada")
             self.db.atualizar_tarefa(tid, estado="cancelada", mensagem="cancelada")
             return
         except (ErroMotor, ErroFerramenta) as ex:
+            andamento.fim("erro", f"Erro: {ex}")
             self.db.atualizar_tarefa(tid, estado="erro", mensagem=str(ex))
             return
+        andamento.fim("fim", f"Pronto: {info}")
         self.db.atualizar_tarefa(tid, estado="ok", progresso=1.0, busca_id=busca_id, mensagem=info)
 
-    def _rodar(self, p, progresso, cancelar):
+    def _rodar(self, p, progresso, cancelar, eventos=None):
         L = p["local"]
         local = geo.Local(L["lat"], L["lon"], L["descricao"], L.get("bairro", ""), L.get("cidade", ""))
         perfil = _perfil_de(p["perfil"])
-        res = busca.prospectar(self.motor, local, p["raio_km"] * 1000, perfil, p["modo"], progresso, cancelar)
+        res = busca.prospectar(self.motor, local, p["raio_km"] * 1000, perfil, p["modo"], progresso, cancelar,
+                               eventos=eventos)
         prospects, ocultos = res.prospects, 0
         if p.get("so_novos"):
             vistos = self.db.ja_vistos(EU, [x.chave for x in prospects])

@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS tarefas (
     lugares INTEGER DEFAULT 0,
     mensagem TEXT DEFAULT '',
     busca_id INTEGER,
-    dono TEXT DEFAULT ''
+    dono TEXT DEFAULT '',
+    detalhe TEXT DEFAULT '{}'      -- andamento detalhado (áreas, lugares achados, etapa) para o painel
 );
 """
 CONVERSAS = """
@@ -89,6 +90,9 @@ class Banco:
         with self.trava, self.con:
             self.con.executescript(ESQUEMA)
             self.con.executescript(CONVERSAS)
+            colunas = {r[1] for r in self.con.execute("PRAGMA table_info(tarefas)")}
+            if "detalhe" not in colunas:  # bancos criados antes da versão 0.2.7
+                self.con.execute("ALTER TABLE tarefas ADD COLUMN detalhe TEXT DEFAULT '{}'")
 
     def fechar(self):
         with self.trava:
@@ -214,6 +218,7 @@ class Banco:
             return None
         d = dict(r)
         d["parametros"] = json.loads(d["parametros"])
+        d["detalhe"] = json.loads(d.get("detalhe") or "{}")
         return d
 
     def tarefas(self, chat_id, limite=20):
@@ -224,6 +229,7 @@ class Banco:
         for r in rs:
             d = dict(r)
             d["parametros"] = json.loads(d["parametros"])
+            d.pop("detalhe", None)  # pode ser grande; quem precisa lê com tarefa()
             saida.append(d)
         return saida
 
