@@ -450,6 +450,13 @@ class PainelTest(BaseOpenAI):
         self.assertEqual(pedir(self.base + "/api/config", "POST", {}, dict(self.cab, Origin="https://evil.com"))[0], 403)
         self.assertEqual(pedir(self.base + "/auth/entrar")[0], 401)  # sem token na URL
         self.assertEqual(pedir(self.base + "/arquivos/1/../../etc/passwd?t=" + self.srv.token)[0], 404)
+        # Leaflet só roda se o CDN entregar exatamente o arquivo esperado (SRI), igual no painel e no relatório
+        from prospecta import relatorio
+        for pagina in (html.decode(), relatorio.MODELO):
+            self.assertEqual(pagina.count('integrity="sha384-'), 2)
+            self.assertEqual(pagina.count('crossorigin="anonymous"'), 2)
+            self.assertIn('<meta name="color-scheme" content="light dark">', pagina)
+        self.assertIn("ev.isComposing", html.decode())  # Enter que confirma acentos/IME não envia a mensagem
 
     def test_busca_pelo_painel(self):
         st, cfg = self.api("/api/config", {"meu_nome": "Ana", "minha_empresa": "Limpa Tudo"})

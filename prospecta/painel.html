@@ -3,17 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Prospecta</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<!-- Leaflet 1.9.4 com SRI: o navegador recusa o arquivo se o CDN entregar outro conteúdo -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" referrerpolicy="no-referrer">
 <style>
 :root {
   --fundo:#f4f6f8; --cartao:#ffffff; --texto:#17202b; --suave:#5b6878; --linha:#e1e6eb; --campo:#ffffff;
   --azul:#1f5fbf; --azul-claro:#e8f0fc; --a:#1e8e3e; --b:#d39200; --c:#98a3ae; --erro:#c62828; --ok:#1e8e3e;
-  --wa:#1fa855; --preto:#0d0d0d;
+  --wa:#1fa855; --preto:#0d0d0d; --sobre-azul:#fff;
+  color-scheme:light dark;   /* listas, barras de rolagem e o controle do raio também ficam escuros */
+  accent-color:var(--azul);
 }
 @media (prefers-color-scheme: dark) {
   :root { --fundo:#11151a; --cartao:#1a2028; --texto:#e7ecf1; --suave:#9aa6b3; --linha:#2a323c; --campo:#141a21;
-          --azul:#6ea2ff; --azul-claro:#1d2a3f; --preto:#f2f2f2; }
+          --azul:#6ea2ff; --azul-claro:#1d2a3f; --preto:#f2f2f2; --sobre-azul:#0b1a33; }
 }
 * { box-sizing:border-box; }
 html, body { margin:0; }
@@ -24,9 +29,13 @@ input, select, textarea { width:100%; padding:8px 10px; border:1px solid var(--l
 textarea { resize:vertical; }
 label { display:block; font-size:.85rem; color:var(--suave); margin:10px 0 4px; }
 button { cursor:pointer; border:1px solid var(--linha); background:var(--cartao); border-radius:8px; padding:8px 12px; }
-button.prim { background:var(--azul); border-color:var(--azul); color:#fff; font-weight:600; }
+button.prim { background:var(--azul); border-color:var(--azul); color:var(--sobre-azul); font-weight:600; }
 button.peq { padding:4px 9px; font-size:.85rem; }
 button:disabled { opacity:.55; cursor:default; }
+:focus-visible { outline:2px solid var(--azul); outline-offset:2px; }
+input:user-invalid, select:user-invalid, textarea:user-invalid { border-color:var(--erro); }
+.so-leitor { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+button.link { border:0; background:none; padding:0; color:var(--azul); font-weight:600; text-decoration:underline; }
 header { display:flex; align-items:center; gap:14px; padding:10px 16px; background:var(--cartao); border-bottom:1px solid var(--linha); position:sticky; top:0; z-index:500; }
 header h1 { font-size:1.15rem; margin:0; }
 .pilula { font-size:.8rem; color:var(--suave); display:flex; align-items:center; gap:6px; }
@@ -43,10 +52,14 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 .check input { width:auto; }
 .tarefa { border-top:1px solid var(--linha); padding:8px 0; font-size:.88rem; }
 .tarefa:first-of-type { border-top:none; }
-.barra { height:6px; background:var(--linha); border-radius:4px; overflow:hidden; margin:5px 0; }
-.barra > i { display:block; height:100%; background:var(--azul); transition:width .4s; }
+progress.barra { appearance:none; border:0 solid; overflow:clip; display:block; width:100%; height:6px; margin:5px 0;
+  border-radius:4px; background:var(--linha); --fill:var(--azul); }
+progress.barra::-webkit-progress-bar { background:transparent; }
+progress.barra::-webkit-progress-value { background:var(--fill); border-radius:4px; transition:inline-size .4s; }
+progress.barra::-moz-progress-bar { background:var(--fill); border-radius:4px; }
 .hist { list-style:none; margin:0; padding:0; }
-.hist li { padding:8px 6px; border-radius:8px; cursor:pointer; font-size:.88rem; }
+.hist li { border-radius:8px; font-size:.88rem; }
+.hist li button { display:block; width:100%; text-align:left; border:0; background:none; padding:8px 6px; border-radius:8px; }
 .hist li:hover, .hist li.sel { background:var(--azul-claro); }
 .hist small { color:var(--suave); display:block; }
 #mapa { height:330px; border-radius:10px; border:1px solid var(--linha); margin:10px 0; }
@@ -57,10 +70,7 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 .and-topo h2 { font-size:1.1rem; }
 .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 4px; }
 .chips span { font-size:.78rem; border:1px solid var(--linha); border-radius:999px; padding:2px 9px; color:var(--suave); }
-.barra.grande { height:12px; border-radius:6px; margin:12px 0 4px; }
-.barra.grande > i { background:linear-gradient(90deg,var(--azul),#2b7de9); }
-.barra.viva > i { background-image:linear-gradient(110deg,var(--azul) 40%,#5d9bf0 50%,var(--azul) 60%); background-size:200% 100%; animation:brilho 1.6s linear infinite; }
-@keyframes brilho { from { background-position:100% 0; } to { background-position:-100% 0; } }
+progress.barra.grande { height:12px; border-radius:6px; margin:12px 0 4px; --fill:linear-gradient(90deg,var(--azul),#2b7de9); }
 .and-nums { display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
 .and-nums b { font-size:1.4rem; }
 .etapas { list-style:none; padding:0; margin:12px 0 6px; display:grid; grid-template-columns:repeat(6,1fr); gap:6px; counter-reset:e; }
@@ -68,10 +78,9 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 .etapas li::before { counter-increment:e; content:counter(e); position:absolute; top:0; left:50%; transform:translateX(-50%); width:24px; height:24px; border-radius:50%;
   display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.8rem; background:var(--fundo); border:2px solid var(--linha); }
 .etapas li.feita { color:var(--texto); } .etapas li.feita::before { content:"✓"; background:var(--ok); border-color:var(--ok); color:#fff; }
-.etapas li.agora { color:var(--texto); font-weight:650; } .etapas li.agora::before { border-color:var(--azul); color:var(--azul); animation:pulsa 1.4s ease-in-out infinite; }
+.etapas li.agora { color:var(--texto); font-weight:650; } .etapas li.agora::before { border-color:var(--azul); color:var(--azul); box-shadow:0 0 0 5px color-mix(in srgb, var(--azul) 22%, transparent); }
 .etapas li.erro::before { content:"!"; background:var(--erro); border-color:var(--erro); color:#fff; }
 .etapas li small { display:block; font-weight:400; color:var(--suave); }
-@keyframes pulsa { 50% { box-shadow:0 0 0 6px rgba(31,95,191,.18); } }
 #mapa-and { height:300px; border-radius:10px; border:1px solid var(--linha); margin:10px 0 4px; }
 .leg { display:inline-block; width:10px; height:10px; border-radius:50%; border:2px solid var(--c); margin:0 3px 0 8px; vertical-align:-1px; }
 .leg.pto { background:#f28c28; border-color:#fff; box-shadow:0 0 0 1px #f28c28; }
@@ -92,6 +101,7 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 .acoes-busca { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .lista { display:grid; gap:10px; }
 .p { border:1px solid var(--linha); border-left:5px solid var(--c); border-radius:10px; padding:10px 12px; }
+.p:nth-child(n+4) { content-visibility:auto; contain-intrinsic-size:auto 150px; }
 .p.A { border-left-color:var(--a); } .p.B { border-left-color:var(--b); }
 .topo { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
 .nome { font-weight:650; }
@@ -106,7 +116,7 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 #chat { position:sticky; top:66px; display:flex; flex-direction:column; height:calc(100vh - 96px); min-height:420px; }
 #msgs { flex:1; overflow:auto; display:flex; flex-direction:column; gap:10px; padding:4px 2px 10px; }
 .msg { max-width:92%; padding:8px 11px; border-radius:12px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:.92rem; }
-.msg.eu { align-self:flex-end; background:var(--azul); color:#fff; border-bottom-right-radius:4px; }
+.msg.eu { align-self:flex-end; background:var(--azul); color:var(--sobre-azul); border-bottom-right-radius:4px; }
 .msg.ia { align-self:flex-start; background:var(--fundo); border:1px solid var(--linha); border-bottom-left-radius:4px; white-space:normal; }
 .msg.ia p { margin:0 0 .55em; } .msg.ia > :last-child { margin-bottom:0; }
 .msg.ia ul, .msg.ia ol { margin:0 0 .55em; padding-left:1.3em; } .msg.ia li { margin:.15em 0; }
@@ -126,9 +136,14 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
 .btn-chatgpt { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; background:var(--preto); color:var(--cartao); border:none; border-radius:999px; padding:11px 16px; font-weight:600; }
 .limite { border:1px solid var(--linha); border-radius:10px; padding:10px; margin:6px 0; }
 .limite b { display:block; }
-.modal { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:1000; padding:16px; }
-.modal .cartao { max-width:420px; text-align:center; }
-.aviso { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); background:var(--texto); color:var(--fundo); padding:10px 16px; border-radius:10px; z-index:1100; max-width:90vw; box-shadow:0 4px 20px rgba(0,0,0,.25); }
+dialog#modal { border:0; padding:0; background:transparent; color:var(--texto); max-width:min(420px, calc(100vw - 32px)); overscroll-behavior:contain; }
+dialog#modal::backdrop { background:rgba(0,0,0,.45); overflow:hidden; overscroll-behavior:contain; }
+dialog#modal .cartao { text-align:center; }
+dialog#modal h1 { font-size:1.15rem; margin:0 0 8px; }
+#aviso { inset:auto auto 18px 50%; translate:-50% 0; margin:0; border:0; background:var(--texto); color:var(--fundo); padding:10px 12px 10px 16px;
+  border-radius:10px; max-width:min(90vw, 560px); box-shadow:0 4px 20px rgba(0,0,0,.25); }
+#aviso:popover-open { display:flex; gap:12px; align-items:flex-start; }
+#aviso button { border:0; background:none; color:inherit; padding:0 4px; font-size:1rem; line-height:1.2; }
 .oculto { display:none !important; }
 @media (max-width: 1200px) {
   main { grid-template-columns:300px minmax(0,1fr); }
@@ -210,10 +225,10 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
       <div id="res-and" class="oculto">
         <div class="and-topo">
           <div><h2 id="and-titulo"></h2><div class="dica" id="and-sub"></div></div>
-          <button class="peq" id="and-fechar" title="Fechar o andamento">✕</button>
+          <button class="peq" id="and-fechar" title="Fechar o andamento" aria-label="Fechar o andamento">✕</button>
         </div>
         <div class="chips" id="and-alvos"></div>
-        <div class="barra grande"><i id="and-barra"></i></div>
+        <progress class="barra grande" id="and-barra" max="100" value="0" aria-label="Andamento da busca"></progress>
         <div class="and-nums"><b id="and-pct"></b><span class="dica" id="and-tempo"></span></div>
         <ol class="etapas" id="and-etapas"></ol>
         <div class="kpis" id="and-kpis"></div>
@@ -234,7 +249,7 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
         <div class="dica" id="res-sub"></div>
         <div class="kpis" id="res-kpis"></div>
         <div class="acoes-busca">
-          <select id="rota-n" style="width:auto"><option value="5">Rota com 5</option><option value="8" selected>Rota com 8</option><option value="12">Rota com 12</option></select>
+          <select id="rota-n" style="width:auto" aria-label="Quantas paradas na rota"><option value="5">Rota com 5</option><option value="8" selected>Rota com 8</option><option value="12">Rota com 12</option></select>
           <button id="btn-rota">🗺️ Montar rota</button>
           <button id="btn-exportar">📄 Planilha e relatório</button>
           <span id="links-exp" class="dica"></span>
@@ -242,10 +257,10 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
         <div id="rota" class="rota oculto"></div>
         <div id="mapa"></div>
         <div class="filtros">
-          <input id="f-q" type="search" placeholder="Filtrar por nome, bairro, categoria">
-          <select id="f-p"><option value="">Prioridade</option><option>A</option><option>B</option><option>C</option></select>
-          <select id="f-w"><option value="">WhatsApp?</option><option value="1">Com WhatsApp</option></select>
-          <select id="f-s"><option value="*">Status</option><option value="">Sem status</option></select>
+          <input id="f-q" type="search" placeholder="Filtrar por nome, bairro, categoria" aria-label="Filtrar por nome, bairro ou categoria">
+          <select id="f-p" aria-label="Prioridade"><option value="">Prioridade</option><option>A</option><option>B</option><option>C</option></select>
+          <select id="f-w" aria-label="WhatsApp"><option value="">WhatsApp?</option><option value="1">Com WhatsApp</option></select>
+          <select id="f-s" aria-label="Status do contato"><option value="*">Status</option><option value="">Sem status</option></select>
         </div>
         <div class="lista" id="lista"></div>
       </div>
@@ -273,17 +288,18 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
       </div>
       <div id="chat-dentro" class="oculto" style="display:flex; flex-direction:column; flex:1; min-height:0">
         <div class="linha2">
-          <select id="modelo" title="Modelo"></select>
+          <select id="modelo" title="Modelo" aria-label="Modelo do ChatGPT"></select>
           <button class="peq" id="btn-nova">＋ Nova conversa</button>
         </div>
         <div class="conv-barra">
-          <select id="conversas" title="Conversas anteriores"></select>
-          <button class="peq" id="btn-apagar-conv" title="Apagar esta conversa">🗑️</button>
+          <select id="conversas" title="Conversas anteriores" aria-label="Conversas anteriores"></select>
+          <button class="peq" id="btn-apagar-conv" title="Apagar esta conversa" aria-label="Apagar esta conversa">🗑️</button>
         </div>
         <div class="sobre" id="sobre"></div>
         <div class="plano">Usando seu plano do ChatGPT · <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener">Gerenciar uso</a></div>
-        <div id="msgs"></div>
+        <div id="msgs" role="log" aria-live="polite" aria-label="Conversa com o assistente"></div>
         <form id="entrada">
+          <label for="texto" class="so-leitor">Mensagem para o assistente</label>
           <textarea id="texto" rows="2" placeholder="Ex.: procure academias e clínicas num raio de 2 km da minha empresa"></textarea>
           <button class="prim" id="btn-enviar">Enviar</button>
         </form>
@@ -292,10 +308,15 @@ main { display:grid; grid-template-columns:320px minmax(0,1fr) 380px; gap:14px; 
   </section>
 </main>
 
-<div id="modal" class="modal oculto"><div class="cartao" id="modal-corpo"></div></div>
-<div id="aviso" class="aviso oculto"></div>
+<dialog id="modal" aria-labelledby="modal-titulo"><div class="cartao" id="modal-corpo"></div></dialog>
+<div role="region" aria-label="Avisos">
+  <div id="aviso" popover="manual"><span id="aviso-txt"></span><button type="button" popovertarget="aviso" popovertargetaction="hide" aria-label="Fechar aviso">✕</button></div>
+  <p class="so-leitor">Anúncios para leitor de tela</p>
+  <div id="anuncio" class="so-leitor" aria-live="polite"></div>
+</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 "use strict";
 const TOKEN = "__TOKEN__";
@@ -317,7 +338,17 @@ async function api(caminho, corpo) {
   if (!r.ok) { const err = new Error((d && d.erro) || ("erro " + r.status)); err.dados = d || {}; throw err; }
   return d;
 }
-function aviso(txt, ms = 4000) { const a = $("#aviso"); a.textContent = txt; a.classList.remove("oculto"); clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.add("oculto"), ms); }
+function anunciar(txt) {  // leitor de tela: ariaNotify() quando existe; senão, a região "ao vivo"
+  if (typeof document.ariaNotify === "function") document.ariaNotify(txt);
+  else { const r = $("#anuncio"); r.textContent = ""; setTimeout(() => { r.textContent = txt; }, 50); }
+}
+function aviso(txt, ms = 4000) {
+  const a = $("#aviso"); $("#aviso-txt").textContent = txt;
+  if (a.showPopover && !a.matches(":popover-open")) a.showPopover();
+  anunciar(txt);
+  clearTimeout(aviso.t);
+  aviso.t = setTimeout(() => { if (a.matches(":popover-open")) a.hidePopover(); }, Math.max(ms, 5000));
+}
 function km(v) { return (Math.round(v * 10) / 10).toString().replace(".", ",") + " km"; }
 
 // ── estado geral ──
@@ -380,18 +411,18 @@ function desenharTarefas(ts) {
   $("#tarefas").innerHTML = vis.length ? vis.map(t => `
     <div class="tarefa clicavel ${ANDA && ANDA.id === t.tarefa_id ? "sel" : ""}" data-tarefa="${t.tarefa_id}" title="Ver o andamento em detalhes">
       <div><b>${esc(nomes[t.estado] || t.estado)}</b> · ${esc(t.descricao)}</div>
-      ${["fila", "rodando", "cancelar"].includes(t.estado) ? `<div class="barra"><i style="width:${Math.max(3, t.progresso_pct)}%"></i></div>
+      ${["fila", "rodando", "cancelar"].includes(t.estado) ? `<progress class="barra" max="100" value="${t.progresso_pct}" aria-label="Andamento: ${esc(t.descricao)}"></progress>
         <div class="dica">${esc(t.mensagem || "")} · ${t.lugares_lidos} lugares lidos · estimativa ~${esc(t.estimativa_min)} min
-        <button class="peq" data-cancelar="${t.tarefa_id}">Cancelar</button> <span class="ver">Detalhes ›</span></div>`
-      : `<div class="dica">${esc(t.criada)} · ${esc(t.mensagem || "")} ${t.busca_id ? `<a href="#" data-abrir="${t.busca_id}">ver</a>` : ""}</div>`}
+        <button class="peq" data-cancelar="${t.tarefa_id}">Cancelar</button> <button type="button" class="link ver" data-ver="${t.tarefa_id}">Detalhes ›</button></div>`
+      : `<div class="dica">${esc(t.criada)} · ${esc(t.mensagem || "")} ${t.busca_id ? `<a href="#" data-abrir="${t.busca_id}">ver</a> · ` : ""}<button type="button" class="link" data-ver="${t.tarefa_id}">detalhes</button></div>`}
     </div>`).join("") : '<p class="dica">Nenhuma busca recente.</p>';
 }
 $("#tarefas").addEventListener("click", async ev => {
   const c = ev.target.dataset.cancelar, a = ev.target.dataset.abrir;
   if (c) { ev.preventDefault(); try { await api(`/api/tarefas/${c}/cancelar`, {}); vigiar(true); } catch (e) { aviso(e.message); } }
   if (a) { ev.preventDefault(); abrirBusca(+a); return; }
-  const caixa = !c && ev.target.closest("[data-tarefa]");
-  if (caixa) abrirAndamento(+caixa.dataset.tarefa);
+  const caixa = !c && (ev.target.closest("[data-ver]") || ev.target.closest("[data-tarefa]"));
+  if (caixa) abrirAndamento(+(caixa.dataset.ver || caixa.dataset.tarefa));
 });
 async function vigiar(agora) {
   clearTimeout(vigia);
@@ -456,8 +487,7 @@ function desenharAndamento(t) {
   $("#and-sub").textContent = `até ${String(t.raio_km).replace(".", ",")} km de ${t.local.descricao} · modo ${t.modo}${t.so_novos ? " · só empresas novas" : ""} · iniciada ${t.criada}`;
   $("#and-alvos").innerHTML = t.alvos.map(a => `<span>${esc(a)}</span>`).join("");
   const pct = t.estado === "ok" ? 100 : t.progresso_pct;
-  $("#and-barra").style.width = Math.max(2, pct) + "%";
-  $("#and-barra").parentElement.classList.toggle("viva", t.estado === "rodando");
+  $("#and-barra").value = pct;
   $("#and-pct").textContent = t.estado === "fila" ? "Aguardando" : `${pct}%`;
   $("#and-tempo").textContent = t.estado === "fila"
     ? (t.na_frente ? `${t.na_frente} busca${t.na_frente > 1 ? "s" : ""} na frente · ` : "") + `estimativa ~${t.estimativa_min} min depois de começar`
@@ -484,7 +514,7 @@ function desenharAndamento(t) {
     + (cats.length > 8 ? `<div class="dica">e mais ${cats.length - 8} categorias</div>` : "")
     : `<p class="dica">${t.estado === "fila" ? "A busca ainda não começou." : "As empresas aparecem aqui conforme cada área termina."}</p>`;
   // passo a passo
-  const ev = (x.eventos || []).slice().reverse();
+  const ev = (x.eventos || []).toReversed();
   $("#and-log").innerHTML = ev.length ? ev.map(([ts, txt]) => `<li><time>${new Date(ts * 1000).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit", second: "2-digit"})}</time><span>${esc(txt)}</span></li>`).join("")
     : `<li><span class="dica">${t.estado === "fila" ? "Esperando a vez." : "Começando…"}</span></li>`;
   // ações
@@ -531,8 +561,8 @@ function desenharMapaAnd(t) {
 // ── histórico e resultados ──
 function desenharHist() {
   $("#hist").innerHTML = E.buscas.length ? E.buscas.map(b => `<li data-id="${b.busca_id}" class="${BUSCA && BUSCA.busca_id === b.busca_id ? "sel" : ""}">
-      <b>${esc(b.servico)}</b> · ${esc(b.raio_km)} km<small>${esc(b.local.slice(0, 70))}</small>
-      <small>${esc(b.data)} · ${b.total} empresas · ${b.prioridade_A} A · ${b.com_whatsapp} com WhatsApp</small></li>`).join("")
+      <button type="button" ${BUSCA && BUSCA.busca_id === b.busca_id ? 'aria-current="true"' : ""}><b>${esc(b.servico)}</b> · ${esc(b.raio_km)} km<small>${esc(b.local.slice(0, 70))}</small>
+      <small>${esc(b.data)} · ${b.total} empresas · ${b.prioridade_A} A · ${b.com_whatsapp} com WhatsApp</small></button></li>`).join("")
     : '<li class="dica" style="cursor:default">Nenhuma ainda.</li>';
 }
 $("#hist").addEventListener("click", ev => { const li = ev.target.closest("li[data-id]"); if (li) abrirBusca(+li.dataset.id); });
@@ -595,7 +625,7 @@ function desenharLista() {
         ${url(p.link_maps) ? `<a href="${esc(p.link_maps)}" target="_blank" rel="noopener">📍 Maps</a>` : ""}
         ${p.site_proprio && url(p.site) ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">🌐 Site</a>` : ""}
         ${url(p.instagram) ? `<a href="${esc(p.instagram)}" target="_blank" rel="noopener">📸 Instagram</a>` : ""}
-        <select data-chave="${esc(p.chave)}">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}" ${p.status === v ? "selected" : ""}>${t}</option>`).join("")}</select>
+        <select data-chave="${esc(p.chave)}" aria-label="Status de ${esc(p.nome)}">${Object.entries(STATUS).map(([v, t]) => `<option value="${v}" ${p.status === v ? "selected" : ""}>${t}</option>`).join("")}</select>
         <button class="peq" data-obs="${esc(p.chave)}">📝 Anotar</button>
       </div>
     </div>`).join("") : '<div class="vazio">Nenhuma empresa com esses filtros.</div>';
@@ -642,15 +672,19 @@ function desenharConta() {
   if ($("#lnk-sair")) $("#lnk-sair").onclick = ev => { ev.preventDefault(); sair(); };
   if ($("#lnk-outra")) $("#lnk-outra").onclick = ev => { ev.preventDefault(); location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}&nova=1`; };
   if (dentro && !$("#modelo").options.length) { carregarModelos(); carregarConversas(); }
-  if (dentro && !c.boas_vindas_vista) modal(`<h2>Você está usando seu plano do ChatGPT</h2>
+  if (dentro && !c.boas_vindas_vista) modal(`<h1>Você está usando seu plano do ChatGPT</h1>
     <p>Os pedidos do assistente do Prospecta usam o seu plano do ChatGPT. Você acompanha e limita esse uso nas configurações do ChatGPT.</p>
-    <p><a href="${esc(E.gerenciar_uso)}" target="_blank" rel="noopener">Gerenciar uso</a></p><button class="prim" id="ok-boas">Entendi</button>`,
-    () => $("#ok-boas").onclick = async () => { fecharModal(); E.conta.boas_vindas_vista = true; api("/api/chat/boas-vindas", {}).catch(() => {}); });
+    <p><a href="${esc(E.gerenciar_uso)}" target="_blank" rel="noopener">Gerenciar uso</a></p><button class="prim" id="ok-boas" autofocus>Entendi</button>`,
+    () => {
+      $("#ok-boas").onclick = fecharModal;
+      // fechar de qualquer jeito (botão, Esc, gesto de voltar) conta como "visto"
+      $("#modal").addEventListener("close", () => { E.conta.boas_vindas_vista = true; api("/api/chat/boas-vindas", {}).catch(() => {}); }, {once: true});
+    });
 }
 $("#btn-entrar").onclick = () => location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}`;
 $("#btn-consentir").onclick = () => location.href = `/auth/entrar?t=${encodeURIComponent(TOKEN)}&consentir=1`;
 $("#btn-sair2").onclick = () => sair();
-async function sair() { try { const r = await api("/auth/sair", {}); if (r.aviso) aviso(r.aviso, 8000); } catch (e) {} CONV = null; CONVS = []; $("#msgs").innerHTML = ""; $("#modelo").innerHTML = ""; carregar(); }
+async function sair() { try { const r = await api("/auth/sair", {}); if (r.aviso) aviso(r.aviso, 8000); } catch (e) {} CONV = null; CONVS = []; $("#msgs").replaceChildren(); $("#modelo").replaceChildren(); carregar(); }
 async function carregarModelos() {
   try {
     const ms = await api("/api/chat/modelos");
@@ -720,8 +754,11 @@ function buscaPorId(id) { return E && id ? E.buscas.find(b => b.busca_id === id)
 function curto(local) { return String(local || "").split(",").slice(0, 2).join(",").trim(); }
 function convNova(buscaId) { CONV = {id: null, titulo: "", busca_id: buscaId || null, mensagens: []}; desenharConversa(); }
 function desenharConversa() {
-  $("#msgs").innerHTML = "";
+  const msgs = $("#msgs");
+  msgs.setAttribute("aria-busy", "true");  // não ler a conversa inteira em voz alta ao reabrir
+  msgs.replaceChildren();
   (CONV ? CONV.mensagens : []).forEach(m => m.tipo === "acao" ? acaoChip(m.texto) : bolha(m.tipo, m.texto));
+  msgs.setAttribute("aria-busy", "false");
   atualizarSobre(); desenharListaConv();
 }
 function atualizarSobre() {
@@ -769,7 +806,12 @@ $("#btn-apagar-conv").onclick = async () => {
   try { await api(`/api/chat/conversas/${CONV.id}/apagar`, {}); } catch (e) { aviso("⚠️ " + e.message); return; }
   CONV = null; await carregarConversas(); aviso("Conversa apagada.");
 };
-$("#texto").addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); $("#entrada").requestSubmit(); } });
+$("#texto").addEventListener("keydown", ev => {
+  if (ev.key !== "Enter" || ev.shiftKey) return;
+  ev.preventDefault();
+  if (ev.isComposing || ev.keyCode === 229) return;  // Enter que confirma acentos/IME não envia a mensagem
+  $("#entrada").requestSubmit();
+});
 $("#entrada").addEventListener("submit", async ev => {
   ev.preventDefault();
   const texto = $("#texto").value.trim(); if (!texto) return;
@@ -800,8 +842,13 @@ $("#entrada").addEventListener("submit", async ev => {
 });
 
 // ── utilidades ──
-function modal(html, depois) { $("#modal-corpo").innerHTML = html; $("#modal").classList.remove("oculto"); if (depois) depois(); }
-function fecharModal() { $("#modal").classList.add("oculto"); }
+function modal(html, depois) {  // <dialog> nativo: prende o foco, fecha com Esc e devolve o foco ao fechar
+  $("#modal-corpo").innerHTML = html;
+  const titulo = $("#modal-corpo h1"); if (titulo) titulo.id = "modal-titulo";
+  const d = $("#modal"); if (!d.open) d.showModal();
+  if (depois) depois();
+}
+function fecharModal() { const d = $("#modal"); if (d.open) d.close(); }
 
 (function inicio() {
   const q = new URLSearchParams(location.search);

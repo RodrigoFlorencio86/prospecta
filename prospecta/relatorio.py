@@ -9,12 +9,16 @@ from . import busca, rotas, telefone
 MODELO = """<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Prospects — __TITULO__</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" referrerpolicy="no-referrer">
 <style>
-:root { --fundo:#f6f7f9; --cartao:#fff; --texto:#1c2430; --suave:#5d6b7c; --linha:#e3e7ec; --a:#1e8e3e; --b:#e3a008; --c:#9aa5b1; --azul:#1f5fbf; }
+:root { --fundo:#f6f7f9; --cartao:#fff; --texto:#1c2430; --suave:#5d6b7c; --linha:#e3e7ec; --a:#1e8e3e; --b:#e3a008; --c:#9aa5b1; --azul:#1f5fbf;
+  color-scheme:light dark; accent-color:var(--azul); }
 @media (prefers-color-scheme: dark) { :root { --fundo:#12161c; --cartao:#1b2129; --texto:#e8edf2; --suave:#9aa7b5; --linha:#2b333d; } }
 * { box-sizing:border-box; }
+:focus-visible { outline:2px solid var(--azul); outline-offset:2px; }
 body { margin:0; font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--fundo); color:var(--texto); }
 header { padding:20px 16px 8px; max-width:1100px; margin:auto; }
 h1 { font-size:1.35rem; margin:0 0 4px; }
@@ -30,6 +34,7 @@ main { max-width:1100px; margin:auto; padding:0 16px 40px; }
 .filtros input { flex:1; min-width:180px; }
 .lista { display:grid; gap:10px; }
 .p { background:var(--cartao); border:1px solid var(--linha); border-left:5px solid var(--c); border-radius:10px; padding:12px 14px; }
+.p:nth-child(n+4) { content-visibility:auto; contain-intrinsic-size:auto 160px; }
 .p.A { border-left-color:var(--a); } .p.B { border-left-color:var(--b); }
 .topo { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
 .nome { font-weight:650; font-size:1.02rem; }
@@ -57,10 +62,10 @@ footer { color:var(--suave); font-size:.85rem; max-width:1100px; margin:auto; pa
   <div id="mapa"></div>
   <div class="rota" id="rota"></div>
   <div class="filtros">
-    <input id="q" type="search" placeholder="Filtrar por nome, bairro ou categoria">
-    <select id="fp"><option value="">Todas as prioridades</option><option>A</option><option>B</option><option>C</option></select>
-    <select id="fw"><option value="">Com ou sem WhatsApp</option><option value="1">Só com WhatsApp</option></select>
-    <select id="fs"><option value="">Qualquer status</option><option value="-">Sem status</option></select>
+    <input id="q" type="search" placeholder="Filtrar por nome, bairro ou categoria" aria-label="Filtrar por nome, bairro ou categoria">
+    <select id="fp" aria-label="Prioridade"><option value="">Todas as prioridades</option><option>A</option><option>B</option><option>C</option></select>
+    <select id="fw" aria-label="WhatsApp"><option value="">Com ou sem WhatsApp</option><option value="1">Só com WhatsApp</option></select>
+    <select id="fs" aria-label="Status do contato"><option value="">Qualquer status</option><option value="-">Sem status</option></select>
   </div>
   <div class="lista" id="lista"></div>
 </main>
@@ -68,7 +73,8 @@ footer { color:var(--suave); font-size:.85rem; max-width:1100px; margin:auto; pa
 identifique-se e respeite quem pedir para não ser contatado (LGPD). O status de cada contato fica
 salvo só neste navegador; para guardar de vez, use a planilha.</footer>
 <script id="dados" type="application/json">__DADOS__</script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 const D = JSON.parse(document.getElementById('dados').textContent);
 const STATUS = ["", "⭐ Interessado", "📨 Contatado", "📍 Visitar", "🤝 Cliente", "🚫 Sem interesse"];
@@ -123,7 +129,7 @@ function desenhar() {
         ${p.maps ? `<a href="${esc(p.maps)}" target="_blank" rel="noopener">📍 Maps</a>` : ''}
         ${p.site ? `<a href="${esc(p.site)}" target="_blank" rel="noopener">🌐 Site</a>` : ''}
         ${p.instagram ? `<a href="${esc(p.instagram)}" target="_blank" rel="noopener">📸 Instagram</a>` : ''}
-        <select data-k="${esc(p.chave)}">${STATUS.map(s => `<option ${st[p.chave] === s ? 'selected' : ''} value="${esc(s)}">${s || 'Status…'}</option>`).join('')}</select>
+        <select data-k="${esc(p.chave)}" aria-label="Status de ${esc(p.nome)}">${STATUS.map(s => `<option ${st[p.chave] === s ? 'selected' : ''} value="${esc(s)}">${s || 'Status…'}</option>`).join('')}</select>
       </div>
     </div>`).join('') : '<div class="vazio">Nenhum prospect com esses filtros.</div>';
 }
